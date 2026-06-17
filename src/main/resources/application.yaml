@@ -1,0 +1,21 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/BancoChamados
+    username: postgres
+    password: postgres # Troque pela senha do seu banco local
+  
+  jpa:
+    # Desativa a criação automática de tabelas pelo Hibernate, pois usaremos o Flyway
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+
+server:
+  port: 7000
