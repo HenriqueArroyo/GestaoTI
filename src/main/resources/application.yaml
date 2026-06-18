@@ -19,3 +19,8 @@ spring:
 
 server:
   port: 7000
+
+api:
+  security:
+    token:
+      secret: ${JWT_SECRET:gestao-ti-2026-super-secret-key}
