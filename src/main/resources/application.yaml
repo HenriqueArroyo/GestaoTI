@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/BancoChamados
+    url: jdbc:postgresql://localhost:5432/BancoGestao
     username: postgres
     password: postgres # Troque pela senha do seu banco local
   
