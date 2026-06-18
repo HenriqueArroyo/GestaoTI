@@ -16,7 +16,7 @@ CREATE TABLE users (
     senha VARCHAR(255) NOT NULL,
     role VARCHAR(20) NOT NULL DEFAULT 'USER', -- ADMIN, TECNICO, USER
     empresa_acesso VARCHAR(50) NOT NULL DEFAULT 'AMBAS', -- ENGEBAG, BAG_CLEANER, AMBAS
-    id_departamento INT REFERENCES departamentos(id) ON DELETE SET NULL,
+    id_departamento BIGINT REFERENCES departamentos(id) ON DELETE SET NULL, -- CORRIGIDO PARA BIGINT
     data_cadastro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     ativo BOOLEAN DEFAULT TRUE
 );
@@ -29,7 +29,7 @@ CREATE TABLE ativos (
     nome_equipamento VARCHAR(255) NOT NULL,
     ip VARCHAR(50),
     local_setor VARCHAR(100),
-    id_usuario_responsavel INT REFERENCES users(id) ON DELETE SET NULL,
+    id_usuario_responsavel BIGINT REFERENCES users(id) ON DELETE SET NULL, -- CORRIGIDO PARA BIGINT
     detalhes_tecnicos JSONB, 
     observacao TEXT,
     data_cadastro TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -69,8 +69,8 @@ CREATE TABLE chamados (
     empresa VARCHAR(50) NOT NULL, -- ENGEBAG, BAG_CLEANER
     criticidade VARCHAR(20) NOT NULL DEFAULT 'BAIXA', 
     status VARCHAR(20) NOT NULL DEFAULT 'ABERTO', 
-    id_usuario_abriu INT NOT NULL REFERENCES users(id),
-    id_tecnico_atribuido INT REFERENCES users(id) ON DELETE SET NULL,
+    id_usuario_abriu BIGINT NOT NULL REFERENCES users(id), -- CORRIGIDO PARA BIGINT
+    id_tecnico_atribuido BIGINT REFERENCES users(id) ON DELETE SET NULL, -- CORRIGIDO PARA BIGINT
     data_abertura TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     data_fechamento TIMESTAMP NULL,
     sla_cumprido BOOLEAN NULL 
@@ -79,8 +79,8 @@ CREATE TABLE chamados (
 -- 7. Tabela de Mensagens do Chat
 CREATE TABLE mensagens_chamado (
     id BIGSERIAL PRIMARY KEY,
-    id_chamado INT NOT NULL REFERENCES chamados(id) ON DELETE CASCADE,
-    id_usuario INT NOT NULL REFERENCES users(id),
+    id_chamado BIGINT NOT NULL REFERENCES chamados(id) ON DELETE CASCADE, -- CORRIGIDO PARA BIGINT
+    id_usuario BIGINT NOT NULL REFERENCES users(id), -- CORRIGIDO PARA BIGINT
     mensagem TEXT NOT NULL,
     tipo_mensagem VARCHAR(20) NOT NULL DEFAULT 'TEXTO', 
     url_arquivo VARCHAR(255),
@@ -103,11 +103,20 @@ CREATE TABLE lembretes (
     id BIGSERIAL PRIMARY KEY,
     titulo VARCHAR(255) NOT NULL,
     descricao TEXT,
-    data_alerta TIMESTAMP, -- Data em que o sistema deve notificar
-    frequencia VARCHAR(20), -- Única, Semanal, Mensal, Anual
-    status VARCHAR(20) NOT NULL DEFAULT 'PENDENTE', -- PENDENTE, CONCLUIDO
-    id_usuario_criador INT REFERENCES users(id) ON DELETE SET NULL,
+    data_alerta TIMESTAMP, 
+    frequencia VARCHAR(20), 
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDENTE', 
+    id_usuario_criador BIGINT REFERENCES users(id) ON DELETE SET NULL, -- CORRIGIDO PARA BIGINT
     data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE chamado_participantes (
+    id BIGSERIAL PRIMARY KEY,
+    id_chamado BIGINT NOT NULL REFERENCES chamados(id) ON DELETE CASCADE,
+    id_usuario BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    papel VARCHAR(50) NOT NULL, -- Ex: 'SOLICITANTE_EXTRA', 'TECNICO_AUXILIAR'
+    data_adicao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(id_chamado, id_usuario) 
 );
 
 -- ==============================================================================
@@ -120,3 +129,4 @@ CREATE INDEX idx_ativos_tipo ON ativos(tipo_ativo);
 CREATE INDEX idx_credenciais_tipo ON credenciais(tipo_credencial);
 CREATE INDEX idx_mensagens_chamado ON mensagens_chamado(id_chamado);
 CREATE INDEX idx_lembretes_status ON lembretes(status);
+CREATE INDEX idx_participantes_chamado ON chamado_participantes(id_chamado);
