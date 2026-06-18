@@ -18,7 +18,7 @@ public class DatabaseSeeder implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        
+        try {
         // 1. Cria o Admin se a tabela estiver vazia (ou se o admin não existir)
         if (userRepository.findByEmail("admin@engebag.com.br").isEmpty()) {
             User admin = new User();
@@ -56,6 +56,9 @@ public class DatabaseSeeder implements CommandLineRunner {
             comum.setAtivo(true);
             userRepository.save(comum);
             System.out.println("✅ Usuário Comum padrão criado no banco de dados.");
+        }
+        } catch (Exception e) {
+            System.out.println("⚠️ O Seeder detectou dados existentes ou encontrou um conflito. Ignorando a inserção automática de usuários. Erro: " + e.getMessage());
         }
     }
 }
