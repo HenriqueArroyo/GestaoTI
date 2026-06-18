@@ -32,6 +32,9 @@ public class User implements UserDetails {
     @Column(name = "data_cadastro", insertable = false, updatable = false)
     private LocalDateTime dataCadastro;
 
+    @Column(name = "empresa_acesso", nullable = false, length = 50)
+    private String empresaAcesso;
+
     private Boolean ativo;
 
     // --- Métodos do UserDetails ---
@@ -123,5 +126,11 @@ public class User implements UserDetails {
         this.ativo = ativo;
     }
 
-    
+    public String getEmpresaAcesso() {
+        return empresaAcesso;
+    }
+
+    public void setEmpresaAcesso(String empresaAcesso) {
+        this.empresaAcesso = empresaAcesso;
+    }
 }

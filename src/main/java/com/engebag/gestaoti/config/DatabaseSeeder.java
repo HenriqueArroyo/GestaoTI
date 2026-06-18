@@ -26,6 +26,7 @@ public class DatabaseSeeder implements CommandLineRunner {
             admin.setEmail("admin@engebag.com.br");
             admin.setSenha(passwordEncoder.encode("123456")); // Usa o gerador oficial!
             admin.setRole("ADMIN");
+            admin.setEmpresaAcesso("AMBAS");
             admin.setAtivo(true);
             userRepository.save(admin);
             System.out.println("✅ Usuário Admin padrão criado no banco de dados.");
@@ -38,6 +39,7 @@ public class DatabaseSeeder implements CommandLineRunner {
             tecnico.setEmail("tecnico@engebag.com.br");
             tecnico.setSenha(passwordEncoder.encode("159753"));
             tecnico.setRole("TECNICO");
+            tecnico.setEmpresaAcesso("AMBAS");
             tecnico.setAtivo(true);
             userRepository.save(tecnico);
             System.out.println("✅ Usuário Técnico padrão criado no banco de dados.");
@@ -50,6 +52,7 @@ public class DatabaseSeeder implements CommandLineRunner {
             comum.setEmail("usuario@engebag.com.br");
             comum.setSenha(passwordEncoder.encode("123456"));
             comum.setRole("USER");
+            comum.setEmpresaAcesso("ENGEBAG"); // Só vê chamados e ativos da Engebag
             comum.setAtivo(true);
             userRepository.save(comum);
             System.out.println("✅ Usuário Comum padrão criado no banco de dados.");

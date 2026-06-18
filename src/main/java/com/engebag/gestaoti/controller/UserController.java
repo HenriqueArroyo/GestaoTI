@@ -34,8 +34,11 @@ public class UserController {
         newUser.setSenha(passwordEncoder.encode(data.senha()));
         
         newUser.setRole(data.role());
-        newUser.setAtivo(true);
+ 
+        // Mapeia o acesso à empresa (ENGEBAG, BAG_CLEANER ou AMBAS)
+        newUser.setEmpresaAcesso(data.empresaAcesso());
 
+        newUser.setAtivo(true);
         // 4. Salva no banco de dados
         userRepository.save(newUser);
 

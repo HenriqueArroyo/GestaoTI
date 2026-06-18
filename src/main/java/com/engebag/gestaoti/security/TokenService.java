@@ -19,14 +19,16 @@ public class TokenService {
     @Value("${api.security.token.secret}")
     private String secret;
 
-    public String generateToken(User user) {
+   public String generateToken(User user) {
         try {
             Algorithm algorithm = Algorithm.HMAC256(secret);
             return JWT.create()
                     .withIssuer("gestao-ti-api")
-                    .withSubject(user.getEmail()) // O "dono" do token
-                    .withClaim("role", user.getAuthorities().iterator().next().getAuthority()) // Guarda o cargo
-                    .withExpiresAt(genExpirationDate()) // Tempo de validade
+                    .withSubject(user.getEmail()) 
+                    .withClaim("role", user.getAuthorities().iterator().next().getAuthority())
+                    // Adicionando a empresa ao Token para o Frontend ler facilmente
+                    .withClaim("empresaAcesso", user.getEmpresaAcesso()) 
+                    .withExpiresAt(genExpirationDate())
                     .sign(algorithm);
         } catch (JWTCreationException exception) {
             throw new RuntimeException("Erro ao gerar token JWT", exception);
