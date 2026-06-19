@@ -32,14 +32,10 @@ public class SecurityConfig {
                 // Define a política de sessão como Stateless (sem estado)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
              // Configura as rotas
-                .authorizeHttpRequests(authorize -> authorize
-                        // Rota de login liberada para todos
+               .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(HttpMethod.POST, "/auth/login").permitAll()
-                        
-                        // APENAS Administradores podem criar novos usuários
+                        .requestMatchers("/ws-gestao/**").permitAll() 
                         .requestMatchers(HttpMethod.POST, "/usuarios").hasRole("ADMIN")
-                        
-                        // Qualquer outra rota exige estar logado
                         .anyRequest().authenticated()
                 )
                 // Adiciona o nosso filtro personalizado ANTES do filtro padrão do Spring

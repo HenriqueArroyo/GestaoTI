@@ -29,7 +29,7 @@ public class DatabaseSeeder implements CommandLineRunner {
     @Override
     public void run(String... args) throws Exception {
         try {
-            // ==========================================
+          // ==========================================
             // 1. CRIAÇÃO DOS USUÁRIOS
             // ==========================================
             if (userRepository.findByEmail("admin@engebag.com.br").isEmpty()) {
@@ -39,6 +39,10 @@ public class DatabaseSeeder implements CommandLineRunner {
                 admin.setSenha(passwordEncoder.encode("123456"));
                 admin.setRole("ADMIN");
                 admin.setEmpresaAcesso("AMBAS");
+                admin.setCargo("Coordenador de T.I.");
+                admin.setUsuarioRm("admin.rm");
+                admin.setUtilizaOmaxprensa(false);
+                admin.setPrimeiroAcesso(false); // Já configurado
                 admin.setAtivo(true);
                 userRepository.save(admin);
             }
@@ -50,6 +54,10 @@ public class DatabaseSeeder implements CommandLineRunner {
                 tecnico.setSenha(passwordEncoder.encode("123456"));
                 tecnico.setRole("TECNICO");
                 tecnico.setEmpresaAcesso("AMBAS");
+                tecnico.setCargo("Analista de Suporte");
+                tecnico.setUsuarioRm("roger.rm");
+                tecnico.setUtilizaOmaxprensa(false);
+                tecnico.setPrimeiroAcesso(false);
                 tecnico.setAtivo(true);
                 userRepository.save(tecnico);
             }
@@ -61,6 +69,10 @@ public class DatabaseSeeder implements CommandLineRunner {
                 comumEngebag.setSenha(passwordEncoder.encode("123456"));
                 comumEngebag.setRole("USER");
                 comumEngebag.setEmpresaAcesso("ENGEBAG");
+                comumEngebag.setCargo("Analista de RH");
+                comumEngebag.setUsuarioRm("joao.rh"); // João usa o RM
+                comumEngebag.setUtilizaOmaxprensa(false);
+                comumEngebag.setPrimeiroAcesso(true);
                 comumEngebag.setAtivo(true);
                 userRepository.save(comumEngebag);
             }
@@ -72,6 +84,10 @@ public class DatabaseSeeder implements CommandLineRunner {
                 comumBag.setSenha(passwordEncoder.encode("123456"));
                 comumBag.setRole("USER");
                 comumBag.setEmpresaAcesso("BAG_CLEANER");
+                comumBag.setCargo("Operadora de Máquina");
+                comumBag.setUsuarioRm(null); // Maria não usa o RM
+                comumBag.setUtilizaOmaxprensa(true); // Mas utiliza a OmaxPrensa
+                comumBag.setPrimeiroAcesso(true);
                 comumBag.setAtivo(true);
                 userRepository.save(comumBag);
             }

@@ -26,36 +26,52 @@ public class User implements UserDetails {
     @Column(nullable = false)
     private String senha;
 
+    @Column(length = 100)
+    private String cargo; // NOVO
+
     @Column(nullable = false, length = 20)
     private String role; 
-
-    @Column(name = "data_cadastro", insertable = false, updatable = false)
-    private LocalDateTime dataCadastro;
 
     @Column(name = "empresa_acesso", nullable = false, length = 50)
     private String empresaAcesso;
 
+    @Column(name = "id_departamento")
+    private Long idDepartamento; // NOVO
+
+    @Column(name = "usuario_rm", length = 100)
+    private String usuarioRm; // NOVO
+
+    @Column(name = "utiliza_omaxprensa")
+    private Boolean utilizaOmaxprensa; // NOVO
+
+    @Column(name = "foto_perfil", length = 255)
+    private String fotoPerfil; // NOVO
+
+    @Column(name = "primeiro_acesso")
+    private Boolean primeiroAcesso; // NOVO
+
+    @Column(name = "ultimo_login")
+    private LocalDateTime ultimoLogin; // NOVO
+
+    @Column(name = "data_cadastro", insertable = false, updatable = false)
+    private LocalDateTime dataCadastro;
+
     private Boolean ativo;
 
-    // --- Métodos do UserDetails ---
+    // --- Métodos Obrigatórios do UserDetails ---
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        // Transforma a nossa Role (ADMIN, TECNICO, USER) em um formato que o Spring entende
         return List.of(new SimpleGrantedAuthority("ROLE_" + this.role));
     }
 
     @Override
-    public String getPassword() {
-        return this.senha;
-    }
+    public String getPassword() { return this.senha; }
 
     @Override
-    public String getUsername() {
-        return this.email; // No nosso sistema, o login é o email
-    }
+    public String getUsername() { return this.email; }
 
-@Override
+    @Override
     public boolean isAccountNonExpired() { return true; }
 
     @Override
@@ -66,7 +82,6 @@ public class User implements UserDetails {
 
     @Override
     public boolean isEnabled() { 
-        // Garante que não vai dar NullPointerException se o banco retornar nulo
         return this.ativo != null && this.ativo; 
     }
 
@@ -102,12 +117,76 @@ public class User implements UserDetails {
         this.senha = senha;
     }
 
+    public String getCargo() {
+        return cargo;
+    }
+
+    public void setCargo(String cargo) {
+        this.cargo = cargo;
+    }
+
     public String getRole() {
         return role;
     }
 
     public void setRole(String role) {
         this.role = role;
+    }
+
+    public String getEmpresaAcesso() {
+        return empresaAcesso;
+    }
+
+    public void setEmpresaAcesso(String empresaAcesso) {
+        this.empresaAcesso = empresaAcesso;
+    }
+
+    public Long getIdDepartamento() {
+        return idDepartamento;
+    }
+
+    public void setIdDepartamento(Long idDepartamento) {
+        this.idDepartamento = idDepartamento;
+    }
+
+    public String getUsuarioRm() {
+        return usuarioRm;
+    }
+
+    public void setUsuarioRm(String usuarioRm) {
+        this.usuarioRm = usuarioRm;
+    }
+
+    public Boolean getUtilizaOmaxprensa() {
+        return utilizaOmaxprensa;
+    }
+
+    public void setUtilizaOmaxprensa(Boolean utilizaOmaxprensa) {
+        this.utilizaOmaxprensa = utilizaOmaxprensa;
+    }
+
+    public String getFotoPerfil() {
+        return fotoPerfil;
+    }
+
+    public void setFotoPerfil(String fotoPerfil) {
+        this.fotoPerfil = fotoPerfil;
+    }
+
+    public Boolean getPrimeiroAcesso() {
+        return primeiroAcesso;
+    }
+
+    public void setPrimeiroAcesso(Boolean primeiroAcesso) {
+        this.primeiroAcesso = primeiroAcesso;
+    }
+
+    public LocalDateTime getUltimoLogin() {
+        return ultimoLogin;
+    }
+
+    public void setUltimoLogin(LocalDateTime ultimoLogin) {
+        this.ultimoLogin = ultimoLogin;
     }
 
     public LocalDateTime getDataCadastro() {
@@ -126,11 +205,5 @@ public class User implements UserDetails {
         this.ativo = ativo;
     }
 
-    public String getEmpresaAcesso() {
-        return empresaAcesso;
-    }
-
-    public void setEmpresaAcesso(String empresaAcesso) {
-        this.empresaAcesso = empresaAcesso;
-    }
+   
 }

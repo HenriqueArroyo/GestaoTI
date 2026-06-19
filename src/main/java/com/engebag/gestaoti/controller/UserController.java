@@ -18,28 +18,32 @@ public class UserController {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
-    @PostMapping
+   @PostMapping
     public ResponseEntity registrarUsuario(@RequestBody RegisterRequestDTO data) {
-        // 1. Verifica se o e-mail já existe no banco
         if (userRepository.findByEmail(data.email()).isPresent()) {
             return ResponseEntity.badRequest().body("Erro: E-mail já cadastrado no sistema!");
         }
 
-        // 2. Cria o novo usuário
         User newUser = new User();
         newUser.setNome(data.nome());
         newUser.setEmail(data.email());
-        
-        // 3. A MÁGICA PROFISSIONAL: Criptografa a senha antes de salvar
         newUser.setSenha(passwordEncoder.encode(data.senha()));
-        
         newUser.setRole(data.role());
- 
-        // Mapeia o acesso à empresa (ENGEBAG, BAG_CLEANER ou AMBAS)
-        newUser.setEmpresaAcesso(data.empresaAcesso());
-
+        newUser.setEmpresaAcesso(data.empresaAcesso()); 
+        
+        // --- NOVOS CAMPOS ---
+        newUser.setCargo(data.cargo());
+        newUser.setIdDepartamento(data.idDepartamento());
+        newUser.setUsuarioRm(data.usuarioRm());
+        
+        // Se vier nulo no JSON, define como false
+        newUser.setUtilizaOmaxprensa(data.utilizaOmaxprensa() != null ? data.utilizaOmaxprensa() : false);
+        
+        // Todo novo usuário precisa trocar a senha no primeiro acesso
+        newUser.setPrimeiroAcesso(true); 
+        
         newUser.setAtivo(true);
-        // 4. Salva no banco de dados
+
         userRepository.save(newUser);
 
         return ResponseEntity.ok("Usuário " + data.nome() + " criado com sucesso!");
