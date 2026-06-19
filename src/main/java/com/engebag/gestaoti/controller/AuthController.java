@@ -121,6 +121,50 @@ public class AuthController {
         }
     }
 
+   // 4. AUTO-CADASTRO DE USUÁRIOS (Sign Up)
+    @PostMapping("/cadastrar")
+    public ResponseEntity<?> cadastrarUsuarioPublico(@RequestBody com.engebag.gestaoti.dto.RegistroPublicoDTO data) {
+        
+        // 1. Verifica se o e-mail já existe
+        if (userRepository.findByEmail(data.email()).isPresent()) {
+            return ResponseEntity.badRequest().body("Erro: Este e-mail já está cadastrado no sistema.");
+        }
+
+        // 2. Valida o tamanho da senha
+        if (data.senha() == null || data.senha().length() < 6) {
+            return ResponseEntity.badRequest().body("Erro: A senha deve ter no mínimo 6 caracteres.");
+        }
+
+        // 3. VALIDAÇÃO DOS NOVOS CAMPOS OBRIGATÓRIOS (Cargo e Setor)
+        if (data.cargo() == null || data.cargo().isBlank()) {
+            return ResponseEntity.badRequest().body("Erro: O preenchimento do cargo é obrigatório.");
+        }
+        
+        if (data.idDepartamento() == null) {
+            return ResponseEntity.badRequest().body("Erro: O preenchimento do setor (departamento) é obrigatório.");
+        }
+
+        User newUser = new User();
+        newUser.setNome(data.nome());
+        newUser.setEmail(data.email());
+        newUser.setSenha(passwordEncoder.encode(data.senha()));
+        newUser.setEmpresaAcesso(data.empresaAcesso() != null ? data.empresaAcesso() : "AMBAS");
+        
+        // --- ATRIBUIÇÃO DOS NOVOS CAMPOS ---
+        newUser.setCargo(data.cargo());
+        newUser.setIdDepartamento(data.idDepartamento());
+        
+        // --- REGRAS DE SEGURANÇA FORÇADAS ---
+        newUser.setRole("USER"); 
+        newUser.setPrimeiroAcesso(false); 
+        newUser.setUtilizaOmaxprensa(false); 
+        newUser.setAtivo(true); 
+
+        userRepository.save(newUser);
+
+        return ResponseEntity.ok("Cadastro realizado com sucesso! Você já pode fazer login no sistema.");
+    }
+
 
 
 }

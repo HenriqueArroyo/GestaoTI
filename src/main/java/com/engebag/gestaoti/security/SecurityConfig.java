@@ -43,7 +43,9 @@ public class SecurityConfig {
                         // 1. ROTAS PÚBLICAS (Qualquer um acessa sem token)
                         .requestMatchers(HttpMethod.POST, "/auth/login").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/esqueci-senha").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/auth/cadastrar").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/redefinir-senha").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/departamentos").permitAll()
                         .requestMatchers("/ws-gestao/**").permitAll() 
                         
                         // 2. ROTAS DO PRÓPRIO USUÁRIO (O "me" tem que vir ANTES do "{id}")
