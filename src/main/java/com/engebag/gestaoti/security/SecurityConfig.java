@@ -1,5 +1,10 @@
 package com.engebag.gestaoti.security;
 
+
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import java.util.List;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -29,6 +34,8 @@ public class SecurityConfig {
         return http
                 // Desabilita a proteção contra ataques CSRF (não é necessária em APIs REST com JWT)
                 .csrf(csrf -> csrf.disable())
+
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 // Define a política de sessão como Stateless (sem estado)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
              // Configura as rotas
@@ -67,6 +74,30 @@ public class SecurityConfig {
     public PasswordEncoder passwordEncoder() {
         // Usa o BCrypt para verificar se a senha digitada bate com o hash salvo no banco
         return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        
+        // Permite que qualquer IP ou domínio acesse a API (Ideal para desenvolvimento).
+        // Em produção, você pode trocar "*" pelo IP do servidor onde o React está hospedado.
+        configuration.setAllowedOriginPatterns(List.of("*")); 
+        
+        // Quais métodos HTTP o frontend pode usar?
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        
+        // Quais cabeçalhos o frontend pode enviar? (Liberamos todos, inclusive o Authorization)
+        configuration.setAllowedHeaders(List.of("*"));
+        
+        // Permite o envio de credenciais (como cookies ou tokens avançados)
+        configuration.setAllowCredentials(true);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        // Aplica essa regra para TODAS as rotas da sua API (/**)
+        source.registerCorsConfiguration("/**", configuration);
+        
+        return source;
     }
 
     @Bean
