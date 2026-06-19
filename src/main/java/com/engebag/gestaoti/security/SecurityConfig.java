@@ -32,20 +32,25 @@ public class SecurityConfig {
                 // Define a política de sessão como Stateless (sem estado)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
              // Configura as rotas
-            .authorizeHttpRequests(authorize -> authorize
+      .authorizeHttpRequests(authorize -> authorize
                         // 1. ROTAS PÚBLICAS (Qualquer um acessa sem token)
                         .requestMatchers(HttpMethod.POST, "/auth/login").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/esqueci-senha").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/redefinir-senha").permitAll()
                         .requestMatchers("/ws-gestao/**").permitAll() 
                         
-                        // 2. ROTAS DE GESTÃO (Apenas ADMIN e TECNICO)
+                        // 2. ROTAS DO PRÓPRIO USUÁRIO (O "me" tem que vir ANTES do "{id}")
+                        .requestMatchers(HttpMethod.GET, "/usuarios/me").authenticated()
+                        .requestMatchers(HttpMethod.PUT, "/usuarios/me").authenticated()
+                        .requestMatchers(HttpMethod.PUT, "/usuarios/me/configurar-primeiro-acesso").authenticated()
+
+                        // 3. ROTAS DE GESTÃO (Apenas ADMIN e TECNICO)
                         .requestMatchers(HttpMethod.POST, "/usuarios").hasAnyRole("ADMIN", "TECNICO")
                         .requestMatchers(HttpMethod.GET, "/usuarios").hasAnyRole("ADMIN", "TECNICO")
                         .requestMatchers(HttpMethod.PUT, "/usuarios/{id}").hasAnyRole("ADMIN", "TECNICO")
                         .requestMatchers(HttpMethod.POST, "/usuarios/{id}/forcar-redefinicao").hasAnyRole("ADMIN", "TECNICO")
                         
-                        // 3. Qualquer outra rota (como /usuarios/me ou /chamados) exige autenticação
+                        // 4. Qualquer outra rota exige autenticação
                         .anyRequest().authenticated()
                 )
                 // Adiciona o nosso filtro personalizado ANTES do filtro padrão do Spring

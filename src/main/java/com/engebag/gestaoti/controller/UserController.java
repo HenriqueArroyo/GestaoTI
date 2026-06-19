@@ -19,6 +19,9 @@ public class UserController {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private com.engebag.gestaoti.service.EmailService emailService;
+
    @PostMapping
     public ResponseEntity registrarUsuario(@RequestBody RegisterRequestDTO data) {
         if (userRepository.findByEmail(data.email()).isPresent()) {
@@ -82,5 +85,166 @@ public class UserController {
         userRepository.save(user);
 
         return ResponseEntity.ok("Sua senha foi configurada com sucesso! Bem-vindo(a) ao Gestão T.I.");
+    }
+
+    // Método utilitário para pegar o usuário do Token JWT
+    private User getUsuarioLogadoContexto() {
+        return (User) org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+    }
+
+    // 3. VISUALIZAR O PRÓPRIO PERFIL
+    @GetMapping("/me")
+    public ResponseEntity<com.engebag.gestaoti.dto.UsuarioResponseDTO> getMeuPerfil() {
+        User usuarioLogado = getUsuarioLogadoContexto();
+        
+        // Busca do banco para garantir que estamos enviando os dados mais recentes
+        var userOpt = userRepository.findById(usuarioLogado.getId());
+        
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        // Retorna os dados blindados usando o nosso novo DTO
+        return ResponseEntity.ok(new com.engebag.gestaoti.dto.UsuarioResponseDTO(userOpt.get()));
+    }
+
+  // 4. ATUALIZAR O PRÓPRIO PERFIL
+    @PutMapping("/me")
+    public ResponseEntity<?> atualizarMeuPerfil(@RequestBody com.engebag.gestaoti.dto.AtualizarPerfilDTO data) {
+        User usuarioLogado = getUsuarioLogadoContexto();
+        
+        var userOpt = userRepository.findById(usuarioLogado.getId());
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.status(404).body("Usuário não encontrado.");
+        }
+
+        User user = userOpt.get();
+
+        // REGRA DE NEGÓCIO: Nome, Cargo e Departamento não podem ser alterados pelo usuário comum.
+
+        if (data.email() != null && !data.email().isBlank() && !data.email().equals(user.getEmail())) {
+            if (userRepository.findByEmail(data.email()).isPresent()) {
+                return ResponseEntity.badRequest().body("Erro: O e-mail informado já está em uso por outra conta.");
+            }
+            user.setEmail(data.email());
+        }
+
+        if (data.senha() != null && !data.senha().isBlank()) {
+            if (data.senha().length() < 6) {
+                return ResponseEntity.badRequest().body("Erro: A nova senha deve ter no mínimo 6 caracteres.");
+            }
+            user.setSenha(passwordEncoder.encode(data.senha()));
+        }
+
+        if (data.usuarioRm() != null) {
+            user.setUsuarioRm(data.usuarioRm());
+        }
+        
+        if (data.utilizaOmaxprensa() != null) {
+            user.setUtilizaOmaxprensa(data.utilizaOmaxprensa());
+        }
+
+        if (data.fotoPerfil() != null) {
+            user.setFotoPerfil(data.fotoPerfil());
+        }
+
+        userRepository.save(user);
+
+        return ResponseEntity.ok(new com.engebag.gestaoti.dto.UsuarioResponseDTO(user));
+    }
+
+    // ==============================================================================
+    // BLOCO D: GESTÃO DA EQUIPE (Apenas ADMIN e TECNICO)
+    // ==============================================================================
+
+    // 5. LISTAR TODOS OS USUÁRIOS
+    @GetMapping
+    public ResponseEntity<java.util.List<com.engebag.gestaoti.dto.UsuarioResponseDTO>> listarUsuarios() {
+        // Converte a lista de entidades User para a lista de DTOs blindados
+        var usuarios = userRepository.findAll().stream()
+                .map(com.engebag.gestaoti.dto.UsuarioResponseDTO::new)
+                .toList();
+        
+        return ResponseEntity.ok(usuarios);
+    }
+
+    // 6. EDITAR QUALQUER USUÁRIO
+    @PutMapping("/{id}")
+    public ResponseEntity<?> atualizarUsuarioPeloAdmin(
+            @PathVariable Long id, 
+            @RequestBody com.engebag.gestaoti.dto.AdminAtualizarUsuarioDTO data) {
+        
+        User tiLogado = getUsuarioLogadoContexto();
+        
+        var targetOpt = userRepository.findById(id);
+        if (targetOpt.isEmpty()) {
+            return ResponseEntity.status(404).body("Erro: Usuário não encontrado.");
+        }
+        
+        User targetUser = targetOpt.get();
+
+        // REGRA DE OURO: Técnico não edita Administrador
+        if (tiLogado.getRole().equals("TECNICO") && targetUser.getRole().equals("ADMIN")) {
+            return ResponseEntity.status(403).body("Acesso Negado: Técnicos não possuem permissão para alterar dados de Administradores.");
+        }
+
+        // Atualiza os campos se eles foram enviados no JSON
+        if (data.nome() != null) targetUser.setNome(data.nome());
+        
+        if (data.email() != null && !data.email().isBlank() && !data.email().equals(targetUser.getEmail())) {
+            if (userRepository.findByEmail(data.email()).isPresent()) {
+                return ResponseEntity.badRequest().body("Erro: O e-mail informado já está em uso.");
+            }
+            targetUser.setEmail(data.email());
+        }
+
+        if (data.cargo() != null) targetUser.setCargo(data.cargo());
+        if (data.role() != null) targetUser.setRole(data.role());
+        if (data.empresaAcesso() != null) targetUser.setEmpresaAcesso(data.empresaAcesso());
+        if (data.idDepartamento() != null) targetUser.setIdDepartamento(data.idDepartamento());
+        if (data.ativo() != null) targetUser.setAtivo(data.ativo());
+
+        userRepository.save(targetUser);
+
+        return ResponseEntity.ok(new com.engebag.gestaoti.dto.UsuarioResponseDTO(targetUser));
+    }
+
+    // 7. FORÇAR REDEFINIÇÃO DE SENHA
+    @PostMapping("/{id}/forcar-redefinicao")
+    public ResponseEntity<?> forcarRedefinicaoSenha(@PathVariable Long id) {
+        User tiLogado = getUsuarioLogadoContexto();
+        
+        var targetOpt = userRepository.findById(id);
+        if (targetOpt.isEmpty()) {
+            return ResponseEntity.status(404).body("Erro: Usuário não encontrado.");
+        }
+        
+        User targetUser = targetOpt.get();
+
+        // REGRA DE OURO: Técnico não reseta senha de Administrador
+        if (tiLogado.getRole().equals("TECNICO") && targetUser.getRole().equals("ADMIN")) {
+            return ResponseEntity.status(403).body("Acesso Negado: Técnicos não possuem permissão para redefinir senhas de Administradores.");
+        }
+
+        // Gera uma senha temporária forte (Ex: Gestao@4912)
+        String senhaTemporaria = "Gestao@" + String.format("%04d", new java.util.Random().nextInt(10000));
+        
+        // Aplica a punição (obriga o usuário a passar pela tela de Primeiro Acesso novamente)
+        targetUser.setSenha(passwordEncoder.encode(senhaTemporaria));
+        targetUser.setPrimeiroAcesso(true);
+        userRepository.save(targetUser);
+
+        // Dispara o E-mail de Aviso
+        String mensagem = "Olá, " + targetUser.getNome() + ".\n\n" +
+                          "A sua senha do portal Gestão T.I. foi redefinida pela nossa equipe.\n" +
+                          "Sua nova senha temporária é: " + senhaTemporaria + "\n\n" +
+                          "No seu próximo login, o sistema exigirá que você cadastre uma nova senha pessoal definitiva.";
+        try {
+            emailService.enviarEmailTexto(targetUser.getEmail(), "Sua senha foi redefinida - Gestão T.I.", mensagem);
+        } catch (Exception e) {
+            return ResponseEntity.ok("Senha alterada para: " + senhaTemporaria + " (Aviso: Falha ao enviar o e-mail).");
+        }
+
+        return ResponseEntity.ok("Senha redefinida com sucesso. A senha temporária (" + senhaTemporaria + ") foi enviada ao e-mail do usuário.");
     }
 }
