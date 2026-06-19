@@ -26,8 +26,9 @@ public class TokenService {
                     .withIssuer("gestao-ti-api")
                     .withSubject(user.getEmail()) 
                     .withClaim("role", user.getAuthorities().iterator().next().getAuthority())
-                    // Adicionando a empresa ao Token para o Frontend ler facilmente
                     .withClaim("empresaAcesso", user.getEmpresaAcesso()) 
+                    // NOVO: Adiciona a flag de primeiro acesso no token para o Frontend ler
+                    .withClaim("primeiroAcesso", user.getPrimeiroAcesso()) 
                     .withExpiresAt(genExpirationDate())
                     .sign(algorithm);
         } catch (JWTCreationException exception) {
