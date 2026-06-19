@@ -13,14 +13,26 @@ spring:
       hibernate:
         format_sql: true
 
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: "engebag8@gmail.com" # Coloque o e-mail que vai enviar as mensagens
+    password: "ejkbenopqhctnkcb" # ATENÇÃO: Se for Gmail, precisa gerar uma Senha de App
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
   flyway:
     enabled: true
     baseline-on-migrate: true
-
-server:
-  port: 7000
 
 api:
   security:
     token:
       secret: ${JWT_SECRET:gestao-ti-2026-super-secret-key}
+
+server:
+  port: 7000

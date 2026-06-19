@@ -24,7 +24,9 @@ CREATE TABLE users (
     primeiro_acesso BOOLEAN DEFAULT TRUE, 
     ultimo_login TIMESTAMP, 
     data_cadastro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    ativo BOOLEAN DEFAULT TRUE
+    ativo BOOLEAN DEFAULT TRUE,
+    codigo_recuperacao VARCHAR(6),
+    validade_codigo_recuperacao TIMESTAMP
 );
 
 -- 3. Tabela Unificada de Ativos/CMDB

@@ -27,7 +27,7 @@ public class User implements UserDetails {
     private String senha;
 
     @Column(length = 100)
-    private String cargo; // NOVO
+    private String cargo;
 
     @Column(nullable = false, length = 20)
     private String role; 
@@ -36,27 +36,34 @@ public class User implements UserDetails {
     private String empresaAcesso;
 
     @Column(name = "id_departamento")
-    private Long idDepartamento; // NOVO
+    private Long idDepartamento;
 
     @Column(name = "usuario_rm", length = 100)
-    private String usuarioRm; // NOVO
+    private String usuarioRm;
 
     @Column(name = "utiliza_omaxprensa")
-    private Boolean utilizaOmaxprensa; // NOVO
+    private Boolean utilizaOmaxprensa;
 
     @Column(name = "foto_perfil", length = 255)
-    private String fotoPerfil; // NOVO
+    private String fotoPerfil;
 
     @Column(name = "primeiro_acesso")
-    private Boolean primeiroAcesso; // NOVO
+    private Boolean primeiroAcesso;
 
     @Column(name = "ultimo_login")
-    private LocalDateTime ultimoLogin; // NOVO
+    private LocalDateTime ultimoLogin;
 
     @Column(name = "data_cadastro", insertable = false, updatable = false)
     private LocalDateTime dataCadastro;
 
     private Boolean ativo;
+
+    // --- VARIÁVEIS DE RECUPERAÇÃO DE SENHA FALTANTES ---
+    @Column(name = "codigo_recuperacao", length = 6)
+    private String codigoRecuperacao;
+
+    @Column(name = "validade_codigo_recuperacao")
+    private LocalDateTime validadeCodigoRecuperacao;
 
     // --- Métodos Obrigatórios do UserDetails ---
 
@@ -85,125 +92,58 @@ public class User implements UserDetails {
         return this.ativo != null && this.ativo; 
     }
 
-    public Long getId() {
-        return id;
-    }
+    // --- GETTERS E SETTERS PADRÃO ---
 
-    public void setId(Long id) {
-        this.id = id;
-    }
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
 
-    public String getNome() {
-        return nome;
-    }
+    public String getNome() { return nome; }
+    public void setNome(String nome) { this.nome = nome; }
 
-    public void setNome(String nome) {
-        this.nome = nome;
-    }
+    public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email; }
 
-    public String getEmail() {
-        return email;
-    }
+    public String getSenha() { return senha; }
+    public void setSenha(String senha) { this.senha = senha; }
 
-    public void setEmail(String email) {
-        this.email = email;
-    }
+    public String getCargo() { return cargo; }
+    public void setCargo(String cargo) { this.cargo = cargo; }
 
-    public String getSenha() {
-        return senha;
-    }
+    public String getRole() { return role; }
+    public void setRole(String role) { this.role = role; }
 
-    public void setSenha(String senha) {
-        this.senha = senha;
-    }
+    public String getEmpresaAcesso() { return empresaAcesso; }
+    public void setEmpresaAcesso(String empresaAcesso) { this.empresaAcesso = empresaAcesso; }
 
-    public String getCargo() {
-        return cargo;
-    }
+    public Long getIdDepartamento() { return idDepartamento; }
+    public void setIdDepartamento(Long idDepartamento) { this.idDepartamento = idDepartamento; }
 
-    public void setCargo(String cargo) {
-        this.cargo = cargo;
-    }
+    public String getUsuarioRm() { return usuarioRm; }
+    public void setUsuarioRm(String usuarioRm) { this.usuarioRm = usuarioRm; }
 
-    public String getRole() {
-        return role;
-    }
+    public Boolean getUtilizaOmaxprensa() { return utilizaOmaxprensa; }
+    public void setUtilizaOmaxprensa(Boolean utilizaOmaxprensa) { this.utilizaOmaxprensa = utilizaOmaxprensa; }
 
-    public void setRole(String role) {
-        this.role = role;
-    }
+    public String getFotoPerfil() { return fotoPerfil; }
+    public void setFotoPerfil(String fotoPerfil) { this.fotoPerfil = fotoPerfil; }
 
-    public String getEmpresaAcesso() {
-        return empresaAcesso;
-    }
+    public Boolean getPrimeiroAcesso() { return primeiroAcesso; }
+    public void setPrimeiroAcesso(Boolean primeiroAcesso) { this.primeiroAcesso = primeiroAcesso; }
 
-    public void setEmpresaAcesso(String empresaAcesso) {
-        this.empresaAcesso = empresaAcesso;
-    }
+    public LocalDateTime getUltimoLogin() { return ultimoLogin; }
+    public void setUltimoLogin(LocalDateTime ultimoLogin) { this.ultimoLogin = ultimoLogin; }
 
-    public Long getIdDepartamento() {
-        return idDepartamento;
-    }
+    public LocalDateTime getDataCadastro() { return dataCadastro; }
+    public void setDataCadastro(LocalDateTime dataCadastro) { this.dataCadastro = dataCadastro; }
 
-    public void setIdDepartamento(Long idDepartamento) {
-        this.idDepartamento = idDepartamento;
-    }
+    public Boolean getAtivo() { return ativo; }
+    public void setAtivo(Boolean ativo) { this.ativo = ativo; }
 
-    public String getUsuarioRm() {
-        return usuarioRm;
-    }
+    // --- GETTERS E SETTERS DE RECUPERAÇÃO DE SENHA ---
 
-    public void setUsuarioRm(String usuarioRm) {
-        this.usuarioRm = usuarioRm;
-    }
+    public String getCodigoRecuperacao() { return codigoRecuperacao; }
+    public void setCodigoRecuperacao(String codigoRecuperacao) { this.codigoRecuperacao = codigoRecuperacao; }
 
-    public Boolean getUtilizaOmaxprensa() {
-        return utilizaOmaxprensa;
-    }
-
-    public void setUtilizaOmaxprensa(Boolean utilizaOmaxprensa) {
-        this.utilizaOmaxprensa = utilizaOmaxprensa;
-    }
-
-    public String getFotoPerfil() {
-        return fotoPerfil;
-    }
-
-    public void setFotoPerfil(String fotoPerfil) {
-        this.fotoPerfil = fotoPerfil;
-    }
-
-    public Boolean getPrimeiroAcesso() {
-        return primeiroAcesso;
-    }
-
-    public void setPrimeiroAcesso(Boolean primeiroAcesso) {
-        this.primeiroAcesso = primeiroAcesso;
-    }
-
-    public LocalDateTime getUltimoLogin() {
-        return ultimoLogin;
-    }
-
-    public void setUltimoLogin(LocalDateTime ultimoLogin) {
-        this.ultimoLogin = ultimoLogin;
-    }
-
-    public LocalDateTime getDataCadastro() {
-        return dataCadastro;
-    }
-
-    public void setDataCadastro(LocalDateTime dataCadastro) {
-        this.dataCadastro = dataCadastro;
-    }
-
-    public Boolean getAtivo() {
-        return ativo;
-    }
-
-    public void setAtivo(Boolean ativo) {
-        this.ativo = ativo;
-    }
-
-   
+    public LocalDateTime getValidadeCodigoRecuperacao() { return validadeCodigoRecuperacao; }
+    public void setValidadeCodigoRecuperacao(LocalDateTime validadeCodigoRecuperacao) { this.validadeCodigoRecuperacao = validadeCodigoRecuperacao; }
 }
