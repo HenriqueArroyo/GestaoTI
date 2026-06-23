@@ -24,6 +24,9 @@ public class ChamadoController {
     @Autowired
     private com.engebag.gestaoti.repository.ChamadoParticipanteRepository participanteRepository;
 
+    @Autowired
+    private com.engebag.gestaoti.repository.MensagemChamadoRepository mensagemChamadoRepository;
+
     // 1. LISTAR CHAMADOS (Filtra de acordo com a empresa do usuário)
     @GetMapping
     public ResponseEntity<List<Chamado>> listarChamados() {
@@ -84,6 +87,14 @@ public class ChamadoController {
             if (!usuarioLogado.getEmpresaAcesso().equals("AMBAS") && 
                 !usuarioLogado.getEmpresaAcesso().equals(chamado.getEmpresa())) {
                 return ResponseEntity.status(403).body("Erro: Sem permissão para alterar chamados da " + chamado.getEmpresa());
+            }
+
+            // 2.5 Trava de Autoria (Regra: Comum só altera o próprio chamado, T.I. altera qualquer um)
+            boolean isEquipeTi = usuarioLogado.getRole().equals("ADMIN") || usuarioLogado.getRole().equals("TECNICO");
+            boolean isCriador = chamado.getUsuarioAbriu().getId().equals(usuarioLogado.getId());
+
+            if (!isEquipeTi && !isCriador) {
+                return ResponseEntity.status(403).body("Acesso Negado: Você só pode convidar participantes para chamados criados por você.");
             }
 
             // 3. Busca o usuário que vai ser convidado
@@ -177,8 +188,120 @@ public class ChamadoController {
             return ResponseEntity.status(500).body("Erro Interno no Servidor: " + e.getMessage());
         }
     }
+
     // Método utilitário para pegar o usuário logado atual através do JWT
     private User getUsuarioLogado() {
         return (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
     }
+
+    // ROTA PARA O FRONTEND CARREGAR O HISTÓRICO QUANDO ABRIR A TELA
+    @GetMapping("/{idChamado}/mensagens")
+    public ResponseEntity<?> carregarHistoricoChat(@PathVariable Long idChamado) {
+        try {
+            User usuarioLogado = getUsuarioLogado();
+
+            var chamadoOpt = chamadoRepository.findById(idChamado);
+            if (chamadoOpt.isEmpty()) {
+                return ResponseEntity.status(404).body("Erro: Chamado não encontrado.");
+            }
+            Chamado chamado = chamadoOpt.get();
+
+            // Validação de segurança para ler o chat
+            boolean isAdmin = usuarioLogado.getRole().equals("ADMIN");
+            boolean isCriador = chamado.getUsuarioAbriu().getId().equals(usuarioLogado.getId());
+            boolean isTecnico = chamado.getTecnicoPrincipal() != null && chamado.getTecnicoPrincipal().getId().equals(usuarioLogado.getId());
+            boolean isParticipante = participanteRepository.existsByChamadoAndUsuario(chamado, usuarioLogado);
+
+            if (!isAdmin && !isCriador && !isTecnico && !isParticipante) {
+                return ResponseEntity.status(403).body("Acesso Negado: Você não tem permissão para ler este chat.");
+            }
+
+            // Busca as mensagens usando o seu repository
+            var mensagens = mensagemChamadoRepository.findByChamadoIdOrderByDataEnvioAsc(idChamado).stream()
+                .map(m -> new com.engebag.gestaoti.dto.MensagemResponseDTO(
+                        m.getId(), 
+                        m.getUsuario().getNome(), 
+                        m.getMensagem(), 
+                        m.getDataEnvio() != null ? m.getDataEnvio().toString() : ""
+                )).toList();
+
+            return ResponseEntity.ok(mensagens);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Erro interno ao carregar histórico: " + e.getMessage());
+        }
+    }
+
+    // 7. ATUALIZAR INFORMAÇÕES E FECHAR CHAMADO
+    @PutMapping("/{idChamado}")
+    public ResponseEntity<?> atualizarChamado(
+            @PathVariable Long idChamado, 
+            @RequestBody com.engebag.gestaoti.dto.AtualizarChamadoDTO data) {
+        try {
+            User usuarioLogado = getUsuarioLogado();
+            
+            var chamadoOpt = chamadoRepository.findById(idChamado);
+            if (chamadoOpt.isEmpty()) {
+                return ResponseEntity.status(404).body("Erro: Chamado não encontrado.");
+            }
+            Chamado chamado = chamadoOpt.get();
+
+            // Identificação de papéis no ticket
+            boolean isAdmin = usuarioLogado.getRole().equals("ADMIN");
+            boolean isTecnicoPrincipal = chamado.getTecnicoPrincipal() != null && chamado.getTecnicoPrincipal().getId().equals(usuarioLogado.getId());
+            boolean isCriador = chamado.getUsuarioAbriu().getId().equals(usuarioLogado.getId());
+
+            // Se o usuário não tem nenhuma relação com o ticket (e não é Admin), bloqueia
+            if (!isAdmin && !isTecnicoPrincipal && !isCriador) {
+                return ResponseEntity.status(403).body("Erro: Você não tem permissão para alterar este chamado.");
+            }
+
+            // --- REGRA DE NEGÓCIO: SUPER PODERES DO ADMIN ---
+            if (isAdmin) {
+                if (data.empresa() != null) chamado.setEmpresa(data.empresa());
+            }
+
+            // --- REGRA DE NEGÓCIO: PODERES DA T.I. (Admin e Técnico) ---
+            if (isAdmin || isTecnicoPrincipal) {
+                if (data.categoria() != null) chamado.setCategoria(data.categoria());
+                if (data.criticidade() != null) chamado.setCriticidade(data.criticidade());
+                if (data.slaCumprido() != null) chamado.setSlaCumprido(data.slaCumprido());
+            }
+
+            // --- REGRA DE STATUS E FECHAMENTO ---
+            if (data.status() != null && !data.status().equals(chamado.getStatus())) {
+                
+                // Trava: Usuário comum (criador) só pode alterar o status se for para CANCELAR o ticket dele
+                if (!isAdmin && !isTecnicoPrincipal && isCriador && !data.status().equals("CANCELADO")) {
+                     return ResponseEntity.status(403).body("Erro: Como usuário comum, você só possui permissão para mudar o status para 'CANCELADO'.");
+                }
+
+                chamado.setStatus(data.status());
+
+                // Se o status for de encerramento, crava a data final
+                if (data.status().equals("RESOLVIDO") || data.status().equals("FECHADO") || data.status().equals("CANCELADO")) {
+                    if (chamado.getDataFechamento() == null) {
+                        chamado.setDataFechamento(java.time.LocalDateTime.now());
+                    }
+                } else {
+                    // Se o chamado for reaberto, limpamos a data de fechamento
+                    chamado.setDataFechamento(null);
+                }
+            }
+
+            // Descrição: Qualquer um com acesso ao ticket pode atualizar/complementar a descrição
+            if (data.descricao() != null) {
+                chamado.setDescricao(data.descricao());
+            }
+
+            chamadoRepository.save(chamado);
+            return ResponseEntity.ok("Chamado atualizado com sucesso!");
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Erro Interno no Servidor: " + e.getMessage());
+        }
+    }
 }
+

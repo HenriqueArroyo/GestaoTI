@@ -22,6 +22,10 @@ public class ChamadoParticipante {
     @Column(nullable = false, length = 50)
     private String papel; // Ex: 'SOLICITANTE_EXTRA' ou 'TECNICO_AUXILIAR'
 
+    // NOVO CAMPO: Adicionado para refletir a coluna do banco de dados (V1)
+    @Column(name = "status_convite", nullable = false, length = 20)
+    private String statusConvite = "ACEITO";
+
     @Column(name = "data_adicao", insertable = false, updatable = false)
     private LocalDateTime dataAdicao;
 
@@ -35,4 +39,11 @@ public class ChamadoParticipante {
     public void setPapel(String papel) { this.papel = papel; }
     public LocalDateTime getDataAdicao() { return dataAdicao; }
     public void setDataAdicao(LocalDateTime dataAdicao) { this.dataAdicao = dataAdicao; }
+    public String getStatusConvite() {
+        return statusConvite;
+    }
+    public void setStatusConvite(String statusConvite) {
+        this.statusConvite = statusConvite;
+    }
+    
 }

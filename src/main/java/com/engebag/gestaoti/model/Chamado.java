@@ -2,6 +2,8 @@ package com.engebag.gestaoti.model;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "chamados")
@@ -40,9 +42,10 @@ public class Chamado {
     @ManyToMany
     @JoinTable(
         name = "chamado_participantes",
-        joinColumns = @JoinColumn(name = "chamado_id"),
-        inverseJoinColumns = @JoinColumn(name = "usuario_id")
+        joinColumns = @JoinColumn(name = "id_chamado"), 
+        inverseJoinColumns = @JoinColumn(name = "id_usuario") 
     )
+    private Set<User> participantes = new HashSet<>();
 
     @Column(name = "data_abertura", insertable = false, updatable = false)
     private LocalDateTime dataAbertura;
@@ -52,6 +55,7 @@ public class Chamado {
     private Boolean slaCumprido;
 
     
+    // --- GETTERS E SETTERS ---
 
     public Long getId() {
         return id;
@@ -125,6 +129,14 @@ public class Chamado {
         this.tecnicoPrincipal = tecnicoPrincipal;
     }
 
+    public Set<User> getParticipantes() {
+        return participantes;
+    }
+
+    public void setParticipantes(Set<User> participantes) {
+        this.participantes = participantes;
+    }
+
     public LocalDateTime getDataAbertura() {
         return dataAbertura;
     }
@@ -149,5 +161,4 @@ public class Chamado {
         this.slaCumprido = slaCumprido;
     }
 
-    
 }
