@@ -8,6 +8,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.web.multipart.MultipartFile;
+import com.engebag.gestaoti.model.MensagemChamado;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.util.UUID;
 
 import java.util.List;
 
@@ -17,6 +25,9 @@ public class ChamadoController {
 
     @Autowired
     private ChamadoRepository chamadoRepository;
+
+    @Autowired
+    private SimpMessagingTemplate messagingTemplate;
 
     @Autowired
     private com.engebag.gestaoti.repository.UserRepository userRepository;
@@ -216,13 +227,16 @@ public class ChamadoController {
                 return ResponseEntity.status(403).body("Acesso Negado: Você não tem permissão para ler este chat.");
             }
 
-            // Busca as mensagens usando o seu repository
+         // Busca as mensagens usando o seu repository
             var mensagens = mensagemChamadoRepository.findByChamadoIdOrderByDataEnvioAsc(idChamado).stream()
                 .map(m -> new com.engebag.gestaoti.dto.MensagemResponseDTO(
                         m.getId(), 
                         m.getUsuario().getNome(), 
                         m.getMensagem(), 
-                        m.getDataEnvio() != null ? m.getDataEnvio().toString() : ""
+                        m.getDataEnvio() != null ? m.getDataEnvio().toString() : "",
+                        m.getTipoMensagem(),
+                        m.getUrlArquivo(),
+                        m.getNomeOriginalArquivo()
                 )).toList();
 
             return ResponseEntity.ok(mensagens);
@@ -301,6 +315,155 @@ public class ChamadoController {
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.status(500).body("Erro Interno no Servidor: " + e.getMessage());
+        }
+    }
+
+    // 8. EXCLUIR CHAMADO (Apenas para o ADMIN)
+    @DeleteMapping("/{idChamado}")
+    public ResponseEntity<?> excluirChamado(@PathVariable Long idChamado) {
+        try {
+            User usuarioLogado = getUsuarioLogado();
+
+            // Regra de Negócio: Apenas Admin pode deletar registros físicos
+            if (!usuarioLogado.getRole().equals("ADMIN")) {
+                return ResponseEntity.status(403).body("Acesso Negado: Apenas Administradores possuem permissão para excluir chamados fisicamente do banco de dados.");
+            }
+
+            if (!chamadoRepository.existsById(idChamado)) {
+                return ResponseEntity.status(404).body("Erro: Chamado não encontrado.");
+            }
+
+            // Graças ao ON DELETE CASCADE no seu Flyway, as mensagens e participantes atrelados serão apagados automaticamente!
+            chamadoRepository.deleteById(idChamado);
+            
+            return ResponseEntity.ok("Chamado excluído com sucesso e todo o seu histórico foi apagado.");
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Erro Interno no Servidor: " + e.getMessage());
+        }
+    }
+
+    // 9. REMOVER PARTICIPANTE DO CHAMADO
+    @DeleteMapping("/{idChamado}/participantes/{idUsuario}")
+    public ResponseEntity<?> removerParticipante(@PathVariable Long idChamado, @PathVariable Long idUsuario) {
+        try {
+            User usuarioLogado = getUsuarioLogado();
+
+            var chamadoOpt = chamadoRepository.findById(idChamado);
+            if (chamadoOpt.isEmpty()) {
+                return ResponseEntity.status(404).body("Erro: Chamado não encontrado.");
+            }
+            Chamado chamado = chamadoOpt.get();
+
+            var usuarioOpt = userRepository.findById(idUsuario);
+            if (usuarioOpt.isEmpty()) {
+                return ResponseEntity.status(404).body("Erro: Usuário não encontrado no sistema.");
+            }
+            User usuarioRemover = usuarioOpt.get();
+
+            // Identificação de papéis para permissão
+            boolean isEquipeTi = usuarioLogado.getRole().equals("ADMIN") || usuarioLogado.getRole().equals("TECNICO");
+            boolean isCriador = chamado.getUsuarioAbriu().getId().equals(usuarioLogado.getId());
+            boolean isProprioUsuario = usuarioLogado.getId().equals(idUsuario); // Permite que a pessoa "saia" do chamado
+
+            if (!isEquipeTi && !isCriador && !isProprioUsuario) {
+                return ResponseEntity.status(403).body("Acesso Negado: Você não tem permissão para gerenciar os participantes deste chamado.");
+            }
+
+            // Busca a relação do participante com o chamado
+            var relacaoOpt = participanteRepository.findByChamadoAndUsuario(chamado, usuarioRemover);
+            if (relacaoOpt.isEmpty()) {
+                return ResponseEntity.badRequest().body("Erro: O usuário selecionado não é um participante deste chamado.");
+            }
+
+            // Remove o vínculo
+            participanteRepository.delete(relacaoOpt.get());
+            
+            return ResponseEntity.ok("O usuário " + usuarioRemover.getNome() + " foi removido do chamado.");
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Erro Interno no Servidor: " + e.getMessage());
+        }
+    }
+
+    // 10. ANEXAR ARQUIVO NO CHAMADO
+    @PostMapping("/{idChamado}/anexos")
+    public ResponseEntity<?> enviarAnexo(
+            @PathVariable Long idChamado,
+            @RequestParam("arquivo") MultipartFile arquivo) {
+        try {
+            User usuarioLogado = getUsuarioLogado();
+
+            var chamadoOpt = chamadoRepository.findById(idChamado);
+            if (chamadoOpt.isEmpty()) {
+                return ResponseEntity.status(404).body("Erro: Chamado não encontrado.");
+            }
+            Chamado chamado = chamadoOpt.get();
+
+            // Validação de segurança: apenas quem tem acesso ao chamado pode enviar arquivos
+            boolean isEquipeTi = usuarioLogado.getRole().equals("ADMIN") || usuarioLogado.getRole().equals("TECNICO");
+            boolean isCriador = chamado.getUsuarioAbriu().getId().equals(usuarioLogado.getId());
+            boolean isParticipante = participanteRepository.existsByChamadoAndUsuario(chamado, usuarioLogado);
+
+            if (!isEquipeTi && !isCriador && !isParticipante) {
+                return ResponseEntity.status(403).body("Erro: Você não tem permissão para enviar anexos neste chamado.");
+            }
+
+            if (arquivo.isEmpty()) {
+                return ResponseEntity.badRequest().body("Erro: Nenhum arquivo enviado.");
+            }
+
+            // 1. Cria a pasta uploads/chamados se ela não existir
+            Path diretorioDestino = Paths.get(System.getProperty("user.dir"), "uploads", "chamados");
+            if (!Files.exists(diretorioDestino)) {
+                Files.createDirectories(diretorioDestino);
+            }
+
+            // 2. Gera um nome único para o arquivo
+            String nomeOriginal = arquivo.getOriginalFilename();
+            String extensao = nomeOriginal != null && nomeOriginal.contains(".") 
+                    ? nomeOriginal.substring(nomeOriginal.lastIndexOf(".")) : "";
+            String nomeArquivoSalvo = UUID.randomUUID().toString() + extensao;
+
+            // 3. Salva no disco rígido
+            Path caminhoFinal = diretorioDestino.resolve(nomeArquivoSalvo);
+            Files.copy(arquivo.getInputStream(), caminhoFinal, StandardCopyOption.REPLACE_EXISTING);
+
+            // 4. Monta a URL pública que o frontend vai usar para exibir/baixar
+            String urlArquivo = "http://localhost:7000/uploads/chamados/" + nomeArquivoSalvo;
+
+            // 5. Salva o registro da mensagem no banco de dados
+            MensagemChamado mensagem = new MensagemChamado();
+            mensagem.setChamado(chamado);
+            mensagem.setUsuario(usuarioLogado);
+            mensagem.setMensagem("Enviou um anexo"); // Texto padrão
+            mensagem.setTipoMensagem("ARQUIVO");
+            mensagem.setUrlArquivo(urlArquivo);
+            mensagem.setNomeOriginalArquivo(nomeOriginal);
+            
+            mensagemChamadoRepository.save(mensagem);
+
+            // 6. Monta o DTO que será enviado aos clientes
+            com.engebag.gestaoti.dto.MensagemResponseDTO dto = new com.engebag.gestaoti.dto.MensagemResponseDTO(
+                    mensagem.getId(),
+                    usuarioLogado.getNome(),
+                    mensagem.getMensagem(),
+                    java.time.LocalDateTime.now().toString(),
+                    mensagem.getTipoMensagem(),
+                    mensagem.getUrlArquivo(),
+                    mensagem.getNomeOriginalArquivo()
+            );
+
+            // MÁGICA: Dispara o anexo pelo WebSocket para aparecer na tela de quem estiver olhando o chat!
+            messagingTemplate.convertAndSend("/topic/chamado/" + idChamado, dto);
+
+            return ResponseEntity.ok(dto);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Erro ao processar o upload: " + e.getMessage());
         }
     }
 }

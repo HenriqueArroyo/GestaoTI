@@ -28,6 +28,13 @@ public class MensagemChamado {
     @Column(name = "data_envio", insertable = false, updatable = false)
     private LocalDateTime dataEnvio;
 
+    @Column(name = "url_arquivo")
+    private String urlArquivo;
+
+    @Column(name = "nome_original_arquivo")
+    private String nomeOriginalArquivo;
+
+
     // Getters e Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -41,4 +48,8 @@ public class MensagemChamado {
     public void setTipoMensagem(String tipoMensagem) { this.tipoMensagem = tipoMensagem; }
     public LocalDateTime getDataEnvio() { return dataEnvio; }
     public void setDataEnvio(LocalDateTime dataEnvio) { this.dataEnvio = dataEnvio; }
+    public String getUrlArquivo() { return urlArquivo; }
+    public void setUrlArquivo(String urlArquivo) { this.urlArquivo = urlArquivo; }
+    public String getNomeOriginalArquivo() { return nomeOriginalArquivo; }
+    public void setNomeOriginalArquivo(String nomeOriginalArquivo) { this.nomeOriginalArquivo = nomeOriginalArquivo; }
 }

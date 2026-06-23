@@ -49,12 +49,14 @@ public class ChatController {
         mensagemRepository.save(mensagem); 
         String dataEnvioStr = LocalDateTime.now().toString();
 
-        // Dispara o DTO (Balão de Chat) para todo mundo que estiver na sala
-        return new MensagemResponseDTO(
+     return new MensagemResponseDTO(
                 mensagem.getId(),
                 remetente.getNome(),
                 mensagem.getMensagem(),
-                dataEnvioStr
+                dataEnvioStr,
+                mensagem.getTipoMensagem(),
+                null, // Sem arquivo
+                null  // Sem arquivo
         );
     }
 }
