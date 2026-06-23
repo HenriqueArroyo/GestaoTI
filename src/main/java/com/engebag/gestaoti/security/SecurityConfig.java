@@ -47,11 +47,13 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/auth/redefinir-senha").permitAll()
                         .requestMatchers(HttpMethod.GET, "/departamentos").permitAll()
                         .requestMatchers("/ws-gestao/**").permitAll() 
-                        
+                        .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll() 
+
                         // 2. ROTAS DO PRÓPRIO USUÁRIO (O "me" tem que vir ANTES do "{id}")
                         .requestMatchers(HttpMethod.GET, "/usuarios/me").authenticated()
                         .requestMatchers(HttpMethod.PUT, "/usuarios/me").authenticated()
                         .requestMatchers(HttpMethod.PUT, "/usuarios/me/configurar-primeiro-acesso").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/usuarios/participantes").authenticated()
 
                         // 3. ROTAS DE GESTÃO (Apenas ADMIN e TECNICO)
                         .requestMatchers(HttpMethod.POST, "/usuarios").hasAnyRole("ADMIN", "TECNICO")

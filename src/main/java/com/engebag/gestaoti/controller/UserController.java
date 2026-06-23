@@ -8,6 +8,13 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.multipart.MultipartFile;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/usuarios")
@@ -120,7 +127,6 @@ public class UserController {
 
         User user = userOpt.get();
 
-        // REGRA DE NEGÓCIO: Nome, Cargo e Departamento não podem ser alterados pelo usuário comum.
 
         if (data.email() != null && !data.email().isBlank() && !data.email().equals(user.getEmail())) {
             if (userRepository.findByEmail(data.email()).isPresent()) {
@@ -246,5 +252,59 @@ public class UserController {
         }
 
         return ResponseEntity.ok("Senha redefinida com sucesso. A senha temporária (" + senhaTemporaria + ") foi enviada ao e-mail do usuário.");
+    }
+
+    // 8. UPLOAD DE FOTO DE PERFIL
+    @PostMapping("/me/foto")
+    public ResponseEntity<?> uploadFotoPerfil(@RequestParam("foto") MultipartFile arquivo) {
+        User usuarioLogado = getUsuarioLogadoContexto();
+
+        if (arquivo.isEmpty()) {
+            return ResponseEntity.badRequest().body("Erro: Nenhum arquivo enviado.");
+        }
+
+        try {
+            // 1. Cria a pasta "uploads/perfis" se ela não existir
+            Path diretorioDestino = Paths.get(System.getProperty("user.dir"), "uploads", "perfis");
+            if (!Files.exists(diretorioDestino)) {
+                Files.createDirectories(diretorioDestino);
+            }
+
+            // 2. Gera um nome único para o arquivo (evita que um usuário sobrescreva a foto do outro)
+            String nomeOriginal = arquivo.getOriginalFilename();
+            String extensao = nomeOriginal.substring(nomeOriginal.lastIndexOf("."));
+            String nomeArquivoSalvo = UUID.randomUUID().toString() + extensao;
+
+            // 3. Salva o arquivo fisicamente na pasta
+            Path caminhoFinal = diretorioDestino.resolve(nomeArquivoSalvo);
+            Files.copy(arquivo.getInputStream(), caminhoFinal, StandardCopyOption.REPLACE_EXISTING);
+
+            // 4. Salva a URL no banco de dados do usuário
+            var userOpt = userRepository.findById(usuarioLogado.getId());
+            User user = userOpt.get();
+            
+            // A URL que o frontend vai usar para exibir a imagem
+            String urlImagem = "http://localhost:7000/uploads/perfis/" + nomeArquivoSalvo;
+            user.setFotoPerfil(urlImagem);
+            userRepository.save(user);
+
+            return ResponseEntity.ok(new com.engebag.gestaoti.dto.UsuarioResponseDTO(user));
+
+        } catch (IOException e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Erro interno ao tentar salvar a imagem.");
+        }
+    }
+
+    // 9. LISTAR PARTICIPANTES PARA CHAMADOS (Visível para qualquer usuário logado)
+    @GetMapping("/participantes")
+    public ResponseEntity<java.util.List<com.engebag.gestaoti.dto.UsuarioResumoDTO>> listarParticipantes() {
+        
+        // Busca apenas os usuários ativos no banco
+        var participantesAtivos = userRepository.findByAtivoTrue().stream()
+                .map(com.engebag.gestaoti.dto.UsuarioResumoDTO::new)
+                .toList();
+        
+        return ResponseEntity.ok(participantesAtivos);
     }
 }

@@ -36,12 +36,22 @@ public class Chamado {
     @JoinColumn(name = "id_tecnico_atribuido")
     private User tecnicoPrincipal;
 
+    // A MÁGICA AQUI: A lista de convidados/participantes do chamado
+    @ManyToMany
+    @JoinTable(
+        name = "chamado_participantes",
+        joinColumns = @JoinColumn(name = "chamado_id"),
+        inverseJoinColumns = @JoinColumn(name = "usuario_id")
+    )
+
     @Column(name = "data_abertura", insertable = false, updatable = false)
     private LocalDateTime dataAbertura;
 
     private LocalDateTime dataFechamento;
 
     private Boolean slaCumprido;
+
+    
 
     public Long getId() {
         return id;
