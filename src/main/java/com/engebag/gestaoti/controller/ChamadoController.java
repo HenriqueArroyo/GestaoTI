@@ -186,15 +186,16 @@ public class ChamadoController {
             }
 
             // 4. Regra de Negócio: Assumir e mudar status
+            // 4. Regra de Negócio: Assumir e mudar status
             chamado.setTecnicoPrincipal(usuarioLogado);
-            
+
             if (chamado.getStatus().equals("ABERTO")) {
                 chamado.setStatus("EM_ANDAMENTO");
             }
 
-            chamadoRepository.save(chamado);
+            Chamado chamadoSalvo = chamadoRepository.save(chamado);
 
-            return ResponseEntity.ok("Chamado assumido com sucesso! Você agora é o responsável e o status mudou para EM_ANDAMENTO.");
+            return ResponseEntity.ok(chamadoSalvo);
 
         } catch (Exception e) {
             e.printStackTrace();
