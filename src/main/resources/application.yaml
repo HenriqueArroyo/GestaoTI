@@ -3,6 +3,11 @@ spring:
     url: jdbc:postgresql://localhost:5432/BancoGestao
     username: postgres
     password: postgres # Troque pela senha do seu banco local
+
+  servlet:
+    multipart:
+      max-file-size: 30MB      # Limite máximo para CADA arquivo individual
+      max-request-size: 30MB   # Limite máximo para a soma de todos os dados da requisição
   
   jpa:
     # Desativa a criação automática de tabelas pelo Hibernate, pois usaremos o Flyway

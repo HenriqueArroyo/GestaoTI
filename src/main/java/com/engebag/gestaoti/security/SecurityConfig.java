@@ -49,6 +49,11 @@ public class SecurityConfig {
                         .requestMatchers("/ws-gestao/**").permitAll() 
                         .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll() 
 
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+
+
+                        .requestMatchers(HttpMethod.POST, "/chamados/*/anexos").authenticated()
+
                         // 2. ROTAS DO PRÓPRIO USUÁRIO (O "me" tem que vir ANTES do "{id}")
                         .requestMatchers(HttpMethod.GET, "/usuarios/me").authenticated()
                         .requestMatchers(HttpMethod.PUT, "/usuarios/me").authenticated()

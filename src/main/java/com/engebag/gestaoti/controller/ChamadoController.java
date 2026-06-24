@@ -16,6 +16,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.UUID;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -156,6 +157,7 @@ public class ChamadoController {
 
     // 4. ASSUMIR CHAMADO (Apenas para Técnicos ou Admins)
     @PutMapping("/{idChamado}/assumir")
+    @Transactional
     public ResponseEntity<?> assumirChamado(@PathVariable Long idChamado) {
         try {
             User usuarioLogado = getUsuarioLogado();
