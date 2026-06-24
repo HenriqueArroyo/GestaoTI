@@ -18,6 +18,7 @@ import java.nio.file.StandardCopyOption;
 import java.util.UUID;
 import org.springframework.transaction.annotation.Transactional;
 
+
 import java.util.List;
 
 @RestController
@@ -156,52 +157,56 @@ public class ChamadoController {
     }
 
     // 4. ASSUMIR CHAMADO (Apenas para Técnicos ou Admins)
-    @PutMapping("/{idChamado}/assumir")
-    @Transactional
-    public ResponseEntity<?> assumirChamado(@PathVariable Long idChamado) {
-        try {
-            User usuarioLogado = getUsuarioLogado();
+@PutMapping("/{idChamado}/assumir")
+@Transactional
+public ResponseEntity<?> assumirChamado(@PathVariable Long idChamado) {
+    try {
+        User usuarioLogadoPrincipal = getUsuarioLogado();
 
-            // 1. Trava de Papel (Role): Usuário comum não pode assumir chamados
-            if (usuarioLogado.getRole().equals("USER")) {
-                return ResponseEntity.status(403).body("Erro: Apenas Técnicos ou Administradores podem assumir chamados.");
-            }
-
-            // 2. Verifica se o chamado existe
-            var chamadoOpt = chamadoRepository.findById(idChamado);
-            if (chamadoOpt.isEmpty()) {
-                return ResponseEntity.status(404).body("Erro: Chamado não encontrado.");
-            }
-            Chamado chamado = chamadoOpt.get();
-
-            // Regra de Negócio: Impede assumir um chamado que já tem dono (a não ser que seja um ADMIN forçando a troca)
-            if (chamado.getTecnicoPrincipal() != null && !usuarioLogado.getRole().equals("ADMIN")) {
-                return ResponseEntity.status(403).body("Erro: Este chamado já está atribuído ao técnico " + chamado.getTecnicoPrincipal().getNome());
-            }
-
-            // 3. Trava de Empresa: Verifica se o técnico tem acesso à empresa deste chamado
-            if (!usuarioLogado.getEmpresaAcesso().equals("AMBAS") && 
-                !usuarioLogado.getEmpresaAcesso().equals(chamado.getEmpresa())) {
-                return ResponseEntity.status(403).body("Erro: Você não tem acesso aos chamados da " + chamado.getEmpresa());
-            }
-
-            // 4. Regra de Negócio: Assumir e mudar status
-            // 4. Regra de Negócio: Assumir e mudar status
-            chamado.setTecnicoPrincipal(usuarioLogado);
-
-            if (chamado.getStatus().equals("ABERTO")) {
-                chamado.setStatus("EM_ANDAMENTO");
-            }
-
-            Chamado chamadoSalvo = chamadoRepository.save(chamado);
-
-            return ResponseEntity.ok(chamadoSalvo);
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(500).body("Erro Interno no Servidor: " + e.getMessage());
+        // 1. Trava de Papel (Role): Usuário comum não pode assumir chamados
+        if (usuarioLogadoPrincipal.getRole().equals("USER")) {
+            return ResponseEntity.status(403).body("Erro: Apenas Técnicos ou Administradores podem assumir chamados.");
         }
+
+        // 2. Verifica se o chamado existe
+        var chamadoOpt = chamadoRepository.findById(idChamado);
+        if (chamadoOpt.isEmpty()) {
+            return ResponseEntity.status(404).body("Erro: Chamado não encontrado.");
+        }
+        Chamado chamado = chamadoOpt.get();
+
+        // Regra de Negócio: Impede assumir um chamado que já tem dono (a não ser que seja um ADMIN forçando a troca)
+        if (chamado.getTecnicoPrincipal() != null && !usuarioLogadoPrincipal.getRole().equals("ADMIN")) {
+            return ResponseEntity.status(403).body("Erro: Este chamado já está atribuído ao técnico " + chamado.getTecnicoPrincipal().getNome());
+        }
+
+        // 3. Trava de Empresa: Verifica se o técnico tem acesso à empresa deste chamado
+        if (!usuarioLogadoPrincipal.getEmpresaAcesso().equals("AMBAS") && 
+            !usuarioLogadoPrincipal.getEmpresaAcesso().equals(chamado.getEmpresa())) {
+            return ResponseEntity.status(403).body("Erro: Você não tem acesso aos chamados da " + chamado.getEmpresa());
+        }
+
+        // Buscar o usuário pelo banco para assegurar que ele é uma "Managed Entity"
+        User usuarioLogado = userRepository.findById(usuarioLogadoPrincipal.getId())
+                .orElseThrow(() -> new RuntimeException("Usuário não encontrado na base de dados."));
+
+        // 4. Regra de Negócio: Assumir e mudar status
+        chamado.setTecnicoPrincipal(usuarioLogado);
+
+        if ("ABERTO".equals(chamado.getStatus())) {
+            chamado.setStatus("EM_ANDAMENTO");
+        }
+
+        // Força a escrita (flush) imediata das alterações no banco de dados
+        Chamado chamadoSalvo = chamadoRepository.saveAndFlush(chamado);
+
+        return ResponseEntity.ok(chamadoSalvo);
+
+    } catch (Exception e) {
+        e.printStackTrace();
+        return ResponseEntity.status(500).body("Erro Interno no Servidor: " + e.getMessage());
     }
+}
 
     // Método utilitário para pegar o usuário logado atual através do JWT
     private User getUsuarioLogado() {
@@ -375,7 +380,7 @@ public class ChamadoController {
             }
 
             // Busca a relação do participante com o chamado
-            var relacaoOpt = participanteRepository.findByChamadoAndUsuario(chamado, usuarioRemover);
+            var relacaoOpt = participanteRepository.existsByChamadoAndUsuario(chamado, usuarioRemover);
             if (relacaoOpt.isEmpty()) {
                 return ResponseEntity.badRequest().body("Erro: O usuário selecionado não é um participante deste chamado.");
             }
