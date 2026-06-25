@@ -155,6 +155,38 @@ public class ChamadoController {
             return ResponseEntity.status(500).body("Erro Interno no Servidor: " + e.getMessage());
         }
     }
+    
+     // 4. LISTAR PARTICIPANTES DO CHAMADO
+    @GetMapping("/{idChamado}/participantes")
+    public ResponseEntity<?> listarParticipantes(@PathVariable Long idChamado) {
+        try {
+            // 1. Verifica se o chamado existe
+            var chamadoOpt = chamadoRepository.findById(idChamado);
+            if (chamadoOpt.isEmpty()) {
+                return ResponseEntity.status(404).body("Erro: Chamado não encontrado.");
+            }
+
+            // 2. Busca os participantes no banco
+            // Supondo que seu repository tenha um método findByChamado
+            List<com.engebag.gestaoti.model.ChamadoParticipante> participantes = participanteRepository.findByChamado(chamadoOpt.get());
+
+            // 3. Monta a resposta limpa para o Front-end (evita erro de loop infinito do JSON)
+            var resposta = participantes.stream().map(p -> java.util.Map.of(
+                "usuario", java.util.Map.of(
+                    "id", p.getUsuario().getId(),
+                    "nome", p.getUsuario().getNome(),
+                    "email", p.getUsuario().getEmail()
+                ),
+                "papel", p.getPapel()
+            )).toList();
+
+            return ResponseEntity.ok(resposta);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Erro Interno no Servidor ao buscar participantes: " + e.getMessage());
+        }
+    }
 
     // 4. ASSUMIR CHAMADO (Apenas para Técnicos ou Admins)
 @PutMapping("/{idChamado}/assumir")
@@ -380,7 +412,7 @@ public ResponseEntity<?> assumirChamado(@PathVariable Long idChamado) {
             }
 
             // Busca a relação do participante com o chamado
-            var relacaoOpt = participanteRepository.existsByChamadoAndUsuario(chamado, usuarioRemover);
+            var relacaoOpt = participanteRepository.findByChamadoAndUsuario(chamado, usuarioRemover);
             if (relacaoOpt.isEmpty()) {
                 return ResponseEntity.badRequest().body("Erro: O usuário selecionado não é um participante deste chamado.");
             }
