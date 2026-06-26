@@ -33,6 +33,15 @@ public class AvisoGeral {
     @Column(name = "data_expiracao")
     private LocalDateTime dataExpiracao;
 
+    @Column(name = "fixado", nullable = false)
+    private Boolean fixado = false;
+ 
+    @Column(name = "url_anexo")
+    private String urlAnexo;
+ 
+    @Column(name = "editado_em")
+    private LocalDateTime editadoEm;
+
     // Getters e Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -50,4 +59,10 @@ public class AvisoGeral {
     public void setDataCriacao(LocalDateTime dataCriacao) { this.dataCriacao = dataCriacao; }
     public LocalDateTime getDataExpiracao() { return dataExpiracao; }
     public void setDataExpiracao(LocalDateTime dataExpiracao) { this.dataExpiracao = dataExpiracao; }
+     public Boolean getFixado()               { return fixado != null ? fixado : false; }
+    public void setFixado(Boolean fixado)    { this.fixado = fixado; }
+    public String getUrlAnexo()              { return urlAnexo; }
+    public void setUrlAnexo(String url)      { this.urlAnexo = url; }
+    public LocalDateTime getEditadoEm()      { return editadoEm; }
+    public void setEditadoEm(LocalDateTime v){ this.editadoEm = v; }
 }

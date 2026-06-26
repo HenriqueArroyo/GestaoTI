@@ -2,44 +2,88 @@ package com.engebag.gestaoti.controller;
 
 import com.engebag.gestaoti.dto.AvisoRequestDTO;
 import com.engebag.gestaoti.dto.AvisoResponseDTO;
+import com.engebag.gestaoti.dto.ComentarioRequestDTO;
+import com.engebag.gestaoti.dto.ComentarioResponseDTO;
 import com.engebag.gestaoti.model.AvisoGeral;
+import com.engebag.gestaoti.model.PostComentario;
+import com.engebag.gestaoti.model.PostCurtida;
+import com.engebag.gestaoti.model.PostFavorito;
 import com.engebag.gestaoti.model.User;
 import com.engebag.gestaoti.repository.AvisoGeralRepository;
+import com.engebag.gestaoti.repository.PostComentarioRepository;
+import com.engebag.gestaoti.repository.PostCurtidaRepository;
+import com.engebag.gestaoti.repository.PostFavoritoRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 @RestController
 @RequestMapping("/avisos")
 public class AvisoGeralController {
 
-    @Autowired
-    private AvisoGeralRepository avisoGeralRepository;
+    @Autowired private AvisoGeralRepository avisoGeralRepository;
+    @Autowired private com.engebag.gestaoti.repository.DepartamentoRepository departamentoRepository;
+    @Autowired private com.engebag.gestaoti.repository.UserRepository userRepository;
+    @Autowired private PostCurtidaRepository curtidaRepository;
+    @Autowired private PostComentarioRepository comentarioRepository;
+    @Autowired private PostFavoritoRepository favoritoRepository;
 
-    @Autowired
-    private com.engebag.gestaoti.repository.DepartamentoRepository departamentoRepository;
-
-    @Autowired
-    private com.engebag.gestaoti.repository.UserRepository userRepository;
-
-    // Utilitário para pegar o usuário logado via JWT
     private User getUsuarioLogado() {
         return (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
     }
 
-   // 1. LISTAR FEED DE AVISOS
+    // ── Utilitário para montar o DTO completo de um aviso ────────────────────
+    private AvisoResponseDTO toDTO(AvisoGeral a, Long usuarioLogadoId) {
+        User criador = a.getUsuarioCriador();
+        String nomeSetor = "";
+        if (criador != null && criador.getIdDepartamento() != null) {
+            nomeSetor = departamentoRepository.findById(criador.getIdDepartamento())
+                    .map(d -> d.getNome()).orElse("");
+        }
+
+        long totalCurtidas   = curtidaRepository.countByAvisoId(a.getId());
+        long totalComentarios = comentarioRepository.countByAvisoId(a.getId());
+        boolean euCurti      = curtidaRepository.existsByAvisoIdAndUsuarioId(a.getId(), usuarioLogadoId);
+        boolean euFavoritei  = favoritoRepository.existsByAvisoIdAndUsuarioId(a.getId(), usuarioLogadoId);
+
+        return new AvisoResponseDTO(
+                a.getId(),
+                a.getTitulo(),
+                a.getConteudo(),
+                a.getUrlImagem(),
+                a.getUrlAnexo(),
+                a.getEmpresaAlvo(),
+                criador != null ? criador.getId() : null,
+                criador != null ? criador.getNome() : "Sistema",
+                criador != null && criador.getCargo() != null ? criador.getCargo() : "",
+                nomeSetor,
+                criador != null ? criador.getFotoPerfil() : null,
+                a.getDataCriacao() != null ? a.getDataCriacao().toString() : LocalDateTime.now().toString(),
+                a.getEditadoEm() != null ? a.getEditadoEm().toString() : null,
+                a.getFixado(),
+                totalCurtidas,
+                totalComentarios,
+                euCurti,
+                euFavoritei
+        );
+    }
+
+    // ── 1. LISTAR FEED ───────────────────────────────────────────────────────
     @GetMapping
     public ResponseEntity<List<AvisoResponseDTO>> listarFeed() {
         User usuarioLogado = getUsuarioLogado();
-        
+
         List<String> empresasPermitidas = new ArrayList<>();
         empresasPermitidas.add("AMBAS");
-        
         if (!usuarioLogado.getEmpresaAcesso().equals("AMBAS")) {
             empresasPermitidas.add(usuarioLogado.getEmpresaAcesso());
         } else {
@@ -49,123 +93,255 @@ public class AvisoGeralController {
 
         List<AvisoGeral> avisos = avisoGeralRepository.findAvisosAtivosParaEmpresas(empresasPermitidas);
 
-        List<AvisoResponseDTO> resposta = avisos.stream().map(a -> {
-            User criador = a.getUsuarioCriador();
-            String nomeSetor = "";
-
-            // Busca o nome do departamento se o usuário tiver um ID vinculado
-            if (criador != null && criador.getIdDepartamento() != null) {
-                nomeSetor = departamentoRepository.findById(criador.getIdDepartamento())
-                        .map(d -> d.getNome())
-                        .orElse("");
-            }
-
-            return new AvisoResponseDTO(
-                    a.getId(),
-                    a.getTitulo(),
-                    a.getConteudo(),
-                    a.getUrlImagem(),
-                    a.getEmpresaAlvo(),
-                    criador != null ? criador.getId() : null,
-                    criador != null ? criador.getNome() : "Sistema",
-                    criador != null && criador.getCargo() != null ? criador.getCargo() : "",
-                    nomeSetor, // <--- Passando a variável que acabamos de buscar
-                    criador != null ? criador.getFotoPerfil() : null,
-                    a.getDataCriacao() != null ? a.getDataCriacao().toString() : LocalDateTime.now().toString()
-            );
-        }).toList();
+        // Fixados aparecem primeiro
+        List<AvisoResponseDTO> resposta = avisos.stream()
+                .sorted(Comparator.comparing(AvisoGeral::getFixado).reversed()
+                        .thenComparing(Comparator.comparing(AvisoGeral::getDataCriacao).reversed()))
+                .map(a -> toDTO(a, usuarioLogado.getId()))
+                .toList();
 
         return ResponseEntity.ok(resposta);
     }
 
-   // 2. CRIAR NOVO AVISO
+    // ── 2. CRIAR AVISO ───────────────────────────────────────────────────────
     @PostMapping
     public ResponseEntity<?> criarAviso(@RequestBody AvisoRequestDTO data) {
         try {
-            // Pega o usuário do JWT (desconectado do Hibernate)
             User usuarioAutenticado = getUsuarioLogado();
-
-            // Re-busca o usuário no banco para atrelá-lo à sessão atual do Hibernate
             User usuarioLogado = userRepository.findById(usuarioAutenticado.getId())
-                    .orElseThrow(() -> new RuntimeException("Usuário não encontrado no banco."));
+                    .orElseThrow(() -> new RuntimeException("Usuário não encontrado."));
 
             AvisoGeral aviso = new AvisoGeral();
             aviso.setTitulo(data.titulo());
             aviso.setConteudo(data.conteudo());
-            aviso.setUrlImagem(data.urlImagem()); 
+            aviso.setUrlImagem(data.urlImagem());
+            aviso.setUrlAnexo(data.urlAnexo());
             aviso.setEmpresaAlvo(data.empresaAlvo() != null ? data.empresaAlvo() : "AMBAS");
             aviso.setDataExpiracao(data.dataExpiracao());
-            
-            // Agora atrelamos a entidade gerenciada pelo banco
+            aviso.setFixado(false);
             aviso.setUsuarioCriador(usuarioLogado);
 
-            AvisoGeral avisoSalvo = avisoGeralRepository.save(aviso);
-
-            return ResponseEntity.ok(avisoSalvo);
-
+            avisoGeralRepository.save(aviso);
+            return ResponseEntity.ok(toDTO(aviso, usuarioLogado.getId()));
         } catch (Exception e) {
             e.printStackTrace();
-            return ResponseEntity.status(500).body("Erro interno no servidor ao criar aviso: " + e.getMessage());
+            return ResponseEntity.status(500).body("Erro ao criar aviso: " + e.getMessage());
         }
     }
 
-    // 3. EXCLUIR AVISO
+    // ── 3. EDITAR AVISO ──────────────────────────────────────────────────────
+    @PutMapping("/{idAviso}")
+    public ResponseEntity<?> editarAviso(@PathVariable Long idAviso, @RequestBody AvisoRequestDTO data) {
+        try {
+            User usuarioLogado = getUsuarioLogado();
+            AvisoGeral aviso = avisoGeralRepository.findById(idAviso)
+                    .orElseThrow(() -> new RuntimeException("Aviso não encontrado."));
+
+            boolean isCriador = aviso.getUsuarioCriador() != null
+                    && aviso.getUsuarioCriador().getId().equals(usuarioLogado.getId());
+            boolean isAdmin = usuarioLogado.getRole().equals("ADMIN");
+
+            if (!isCriador && !isAdmin) {
+                return ResponseEntity.status(403).body("Sem permissão para editar este aviso.");
+            }
+
+            if (data.titulo()   != null) aviso.setTitulo(data.titulo());
+            if (data.conteudo() != null) aviso.setConteudo(data.conteudo());
+            if (data.urlImagem() != null) aviso.setUrlImagem(data.urlImagem());
+            if (data.urlAnexo()  != null) aviso.setUrlAnexo(data.urlAnexo());
+            aviso.setEditadoEm(LocalDateTime.now());
+
+            avisoGeralRepository.save(aviso);
+            return ResponseEntity.ok(toDTO(aviso, usuarioLogado.getId()));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Erro ao editar aviso: " + e.getMessage());
+        }
+    }
+
+    // ── 4. EXCLUIR AVISO ─────────────────────────────────────────────────────
     @DeleteMapping("/{idAviso}")
     public ResponseEntity<?> excluirAviso(@PathVariable Long idAviso) {
         User usuarioLogado = getUsuarioLogado();
-        
-        var avisoOpt = avisoGeralRepository.findById(idAviso);
-        if (avisoOpt.isEmpty()) {
-            return ResponseEntity.status(404).body("Erro: Aviso não encontrado.");
-        }
-        
-        AvisoGeral aviso = avisoOpt.get();
+        AvisoGeral aviso = avisoGeralRepository.findById(idAviso)
+                .orElseThrow(() -> new RuntimeException("Aviso não encontrado."));
 
-        // Regra: Só o criador do aviso ou um ADMIN pode apagar
-        boolean isCriador = aviso.getUsuarioCriador() != null && aviso.getUsuarioCriador().getId().equals(usuarioLogado.getId());
+        boolean isCriador = aviso.getUsuarioCriador() != null
+                && aviso.getUsuarioCriador().getId().equals(usuarioLogado.getId());
         boolean isAdmin = usuarioLogado.getRole().equals("ADMIN");
 
         if (!isCriador && !isAdmin) {
-            return ResponseEntity.status(403).body("Erro: Você não tem permissão para excluir este aviso.");
+            return ResponseEntity.status(403).body("Sem permissão para excluir este aviso.");
         }
 
         avisoGeralRepository.deleteById(idAviso);
         return ResponseEntity.ok("Aviso excluído com sucesso.");
     }
 
-    // 4. UPLOAD DE IMAGEM PARA O AVISO
-    @PostMapping("/upload")
-    public ResponseEntity<?> uploadImagemAviso(@RequestParam("arquivo") org.springframework.web.multipart.MultipartFile arquivo) {
+    // ── 5. FIXAR / DESAFIXAR (apenas ADMIN) ─────────────────────────────────
+    @PatchMapping("/{idAviso}/fixar")
+    public ResponseEntity<?> toggleFixar(@PathVariable Long idAviso) {
+        User usuarioLogado = getUsuarioLogado();
+        if (!usuarioLogado.getRole().equals("ADMIN")) {
+            return ResponseEntity.status(403).body("Apenas administradores podem fixar posts.");
+        }
+
+        AvisoGeral aviso = avisoGeralRepository.findById(idAviso)
+                .orElseThrow(() -> new RuntimeException("Aviso não encontrado."));
+
+        aviso.setFixado(!aviso.getFixado());
+        avisoGeralRepository.save(aviso);
+        return ResponseEntity.ok(Map.of("fixado", aviso.getFixado()));
+    }
+
+    // ── 6. CURTIR / DESCURTIR ────────────────────────────────────────────────
+    @PostMapping("/{idAviso}/curtir")
+    public ResponseEntity<?> toggleCurtir(@PathVariable Long idAviso) {
+        User usuarioLogado = getUsuarioLogado();
+
+        AvisoGeral aviso = avisoGeralRepository.findById(idAviso)
+                .orElseThrow(() -> new RuntimeException("Aviso não encontrado."));
+
+        Optional<PostCurtida> curtidaExistente =
+                curtidaRepository.findByAvisoIdAndUsuarioId(idAviso, usuarioLogado.getId());
+
+        if (curtidaExistente.isPresent()) {
+            curtidaRepository.delete(curtidaExistente.get());
+        } else {
+            User u = userRepository.findById(usuarioLogado.getId()).orElseThrow();
+            PostCurtida curtida = new PostCurtida();
+            curtida.setAviso(aviso);
+            curtida.setUsuario(u);
+            curtidaRepository.save(curtida);
+        }
+
+        long total = curtidaRepository.countByAvisoId(idAviso);
+        boolean euCurti = curtidaRepository.existsByAvisoIdAndUsuarioId(idAviso, usuarioLogado.getId());
+        return ResponseEntity.ok(Map.of("totalCurtidas", total, "euCurti", euCurti));
+    }
+
+    // ── 7. FAVORITAR / DESFAVORITAR ──────────────────────────────────────────
+    @PostMapping("/{idAviso}/favoritar")
+    public ResponseEntity<?> toggleFavoritar(@PathVariable Long idAviso) {
+        User usuarioLogado = getUsuarioLogado();
+
+        AvisoGeral aviso = avisoGeralRepository.findById(idAviso)
+                .orElseThrow(() -> new RuntimeException("Aviso não encontrado."));
+
+        Optional<PostFavorito> favExistente =
+                favoritoRepository.findByAvisoIdAndUsuarioId(idAviso, usuarioLogado.getId());
+
+        if (favExistente.isPresent()) {
+            favoritoRepository.delete(favExistente.get());
+        } else {
+            User u = userRepository.findById(usuarioLogado.getId()).orElseThrow();
+            PostFavorito fav = new PostFavorito();
+            fav.setAviso(aviso);
+            fav.setUsuario(u);
+            favoritoRepository.save(fav);
+        }
+
+        boolean euFavoritei = favoritoRepository.existsByAvisoIdAndUsuarioId(idAviso, usuarioLogado.getId());
+        return ResponseEntity.ok(Map.of("euFavoritei", euFavoritei));
+    }
+
+    // ── 8. LISTAR COMENTÁRIOS ────────────────────────────────────────────────
+    @GetMapping("/{idAviso}/comentarios")
+    public ResponseEntity<?> listarComentarios(@PathVariable Long idAviso) {
+        List<PostComentario> comentarios = comentarioRepository.findByAvisoIdOrderByCriadoEmAsc(idAviso);
+        List<ComentarioResponseDTO> resposta = comentarios.stream().map(c -> new ComentarioResponseDTO(
+                c.getId(),
+                c.getUsuario().getId(),
+                c.getUsuario().getNome(),
+                c.getUsuario().getFotoPerfil(),
+                c.getConteudo(),
+                c.getCriadoEm().toString(),
+                c.getEditadoEm() != null ? c.getEditadoEm().toString() : null
+        )).toList();
+        return ResponseEntity.ok(resposta);
+    }
+
+    // ── 9. CRIAR COMENTÁRIO ──────────────────────────────────────────────────
+    @PostMapping("/{idAviso}/comentarios")
+    public ResponseEntity<?> criarComentario(@PathVariable Long idAviso,
+                                              @RequestBody ComentarioRequestDTO data) {
         try {
-            if (arquivo.isEmpty()) {
-                return ResponseEntity.badRequest().body("Arquivo vazio.");
-            }
+            User usuarioAutenticado = getUsuarioLogado();
+            User usuario = userRepository.findById(usuarioAutenticado.getId()).orElseThrow();
+            AvisoGeral aviso = avisoGeralRepository.findById(idAviso)
+                    .orElseThrow(() -> new RuntimeException("Aviso não encontrado."));
 
-            // Cria a pasta uploads/avisos se não existir
-            java.nio.file.Path diretorioDestino = java.nio.file.Paths.get(System.getProperty("user.dir"), "uploads", "avisos");
-            if (!java.nio.file.Files.exists(diretorioDestino)) {
-                java.nio.file.Files.createDirectories(diretorioDestino);
-            }
+            PostComentario comentario = new PostComentario();
+            comentario.setAviso(aviso);
+            comentario.setUsuario(usuario);
+            comentario.setConteudo(data.conteudo());
+            comentarioRepository.save(comentario);
 
-            // Gera nome único
-            String nomeOriginal = arquivo.getOriginalFilename();
-            String extensao = nomeOriginal != null && nomeOriginal.contains(".") 
-                    ? nomeOriginal.substring(nomeOriginal.lastIndexOf(".")) : "";
-            String nomeArquivoSalvo = java.util.UUID.randomUUID().toString() + extensao;
-
-            // Salva o arquivo no disco
-            java.nio.file.Path caminhoFinal = diretorioDestino.resolve(nomeArquivoSalvo);
-            java.nio.file.Files.copy(arquivo.getInputStream(), caminhoFinal, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-
-            // Monta a URL de retorno (Ajuste a porta 7000 se o seu servidor usar outra)
-            String urlArquivo = "http://localhost:7000/uploads/avisos/" + nomeArquivoSalvo;
-
-            // Retorna um JSON simples com a URL {"url": "http://..."}
-            return ResponseEntity.ok(java.util.Collections.singletonMap("url", urlArquivo));
-
+            return ResponseEntity.ok(new ComentarioResponseDTO(
+                    comentario.getId(),
+                    usuario.getId(),
+                    usuario.getNome(),
+                    usuario.getFotoPerfil(),
+                    comentario.getConteudo(),
+                    comentario.getCriadoEm().toString(),
+                    null
+            ));
         } catch (Exception e) {
             e.printStackTrace();
-            return ResponseEntity.status(500).body("Erro interno no servidor ao fazer upload da imagem: " + e.getMessage());
+            return ResponseEntity.status(500).body("Erro ao criar comentário: " + e.getMessage());
+        }
+    }
+
+    // ── 10. EXCLUIR COMENTÁRIO ───────────────────────────────────────────────
+    @DeleteMapping("/{idAviso}/comentarios/{idComentario}")
+    public ResponseEntity<?> excluirComentario(@PathVariable Long idAviso,
+                                                @PathVariable Long idComentario) {
+        User usuarioLogado = getUsuarioLogado();
+        PostComentario comentario = comentarioRepository.findById(idComentario)
+                .orElseThrow(() -> new RuntimeException("Comentário não encontrado."));
+
+        boolean isCriador = comentario.getUsuario().getId().equals(usuarioLogado.getId());
+        boolean isAdmin   = usuarioLogado.getRole().equals("ADMIN");
+
+        if (!isCriador && !isAdmin) {
+            return ResponseEntity.status(403).body("Sem permissão para excluir este comentário.");
+        }
+
+        comentarioRepository.deleteById(idComentario);
+        return ResponseEntity.ok("Comentário excluído.");
+    }
+
+    // ── 11. UPLOAD DE IMAGEM ─────────────────────────────────────────────────
+    @PostMapping("/upload")
+    public ResponseEntity<?> uploadImagem(@RequestParam("arquivo") MultipartFile arquivo) {
+        return processarUpload(arquivo, "avisos");
+    }
+
+    // ── 12. UPLOAD DE ANEXO ──────────────────────────────────────────────────
+    @PostMapping("/upload-anexo")
+    public ResponseEntity<?> uploadAnexo(@RequestParam("arquivo") MultipartFile arquivo) {
+        return processarUpload(arquivo, "avisos-anexos");
+    }
+
+    private ResponseEntity<?> processarUpload(MultipartFile arquivo, String subpasta) {
+        try {
+            if (arquivo.isEmpty()) return ResponseEntity.badRequest().body("Arquivo vazio.");
+
+            Path dir = Paths.get(System.getProperty("user.dir"), "uploads", subpasta);
+            if (!Files.exists(dir)) Files.createDirectories(dir);
+
+            String nomeOriginal = arquivo.getOriginalFilename();
+            String ext = nomeOriginal != null && nomeOriginal.contains(".")
+                    ? nomeOriginal.substring(nomeOriginal.lastIndexOf(".")) : "";
+            String nomeSalvo = UUID.randomUUID() + ext;
+
+            Files.copy(arquivo.getInputStream(), dir.resolve(nomeSalvo), StandardCopyOption.REPLACE_EXISTING);
+
+            String url = "http://localhost:7000/uploads/" + subpasta + "/" + nomeSalvo;
+            return ResponseEntity.ok(Map.of("url", url, "nomeOriginal", nomeOriginal != null ? nomeOriginal : nomeSalvo));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Erro no upload: " + e.getMessage());
         }
     }
 }
