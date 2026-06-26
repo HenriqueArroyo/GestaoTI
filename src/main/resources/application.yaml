@@ -1,8 +1,8 @@
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/BancoGestao
+    url: jdbc:postgresql://127.0.0.1:5432/erpti
     username: postgres
-    password: postgres # Troque pela senha do seu banco local
+    password: erpti # Troque pela senha do seu banco local
 
   servlet:
     multipart:
