@@ -24,6 +24,9 @@ public class AvisoGeralController {
     @Autowired
     private com.engebag.gestaoti.repository.DepartamentoRepository departamentoRepository;
 
+    @Autowired
+    private com.engebag.gestaoti.repository.UserRepository userRepository;
+
     // Utilitário para pegar o usuário logado via JWT
     private User getUsuarioLogado() {
         return (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
@@ -63,6 +66,7 @@ public class AvisoGeralController {
                     a.getConteudo(),
                     a.getUrlImagem(),
                     a.getEmpresaAlvo(),
+                    criador != null ? criador.getId() : null,
                     criador != null ? criador.getNome() : "Sistema",
                     criador != null && criador.getCargo() != null ? criador.getCargo() : "",
                     nomeSetor, // <--- Passando a variável que acabamos de buscar
@@ -74,23 +78,25 @@ public class AvisoGeralController {
         return ResponseEntity.ok(resposta);
     }
 
-    // 2. CRIAR NOVO AVISO (Apenas TI e RH, por exemplo - ajuste conforme sua regra)
+   // 2. CRIAR NOVO AVISO
     @PostMapping
     public ResponseEntity<?> criarAviso(@RequestBody AvisoRequestDTO data) {
         try {
-            User usuarioLogado = getUsuarioLogado();
+            // Pega o usuário do JWT (desconectado do Hibernate)
+            User usuarioAutenticado = getUsuarioLogado();
 
-            // Opcional: Trava para apenas ADMIN ou cargos específicos postarem
-            // if (usuarioLogado.getRole().equals("USER")) {
-            //     return ResponseEntity.status(403).body("Acesso negado: Apenas a equipe autorizada pode criar avisos globais.");
-            // }
+            // Re-busca o usuário no banco para atrelá-lo à sessão atual do Hibernate
+            User usuarioLogado = userRepository.findById(usuarioAutenticado.getId())
+                    .orElseThrow(() -> new RuntimeException("Usuário não encontrado no banco."));
 
             AvisoGeral aviso = new AvisoGeral();
             aviso.setTitulo(data.titulo());
             aviso.setConteudo(data.conteudo());
-            aviso.setUrlImagem(data.urlImagem()); // Neste primeiro momento, recebe a URL pronta
+            aviso.setUrlImagem(data.urlImagem()); 
             aviso.setEmpresaAlvo(data.empresaAlvo() != null ? data.empresaAlvo() : "AMBAS");
             aviso.setDataExpiracao(data.dataExpiracao());
+            
+            // Agora atrelamos a entidade gerenciada pelo banco
             aviso.setUsuarioCriador(usuarioLogado);
 
             AvisoGeral avisoSalvo = avisoGeralRepository.save(aviso);
@@ -125,5 +131,41 @@ public class AvisoGeralController {
 
         avisoGeralRepository.deleteById(idAviso);
         return ResponseEntity.ok("Aviso excluído com sucesso.");
+    }
+
+    // 4. UPLOAD DE IMAGEM PARA O AVISO
+    @PostMapping("/upload")
+    public ResponseEntity<?> uploadImagemAviso(@RequestParam("arquivo") org.springframework.web.multipart.MultipartFile arquivo) {
+        try {
+            if (arquivo.isEmpty()) {
+                return ResponseEntity.badRequest().body("Arquivo vazio.");
+            }
+
+            // Cria a pasta uploads/avisos se não existir
+            java.nio.file.Path diretorioDestino = java.nio.file.Paths.get(System.getProperty("user.dir"), "uploads", "avisos");
+            if (!java.nio.file.Files.exists(diretorioDestino)) {
+                java.nio.file.Files.createDirectories(diretorioDestino);
+            }
+
+            // Gera nome único
+            String nomeOriginal = arquivo.getOriginalFilename();
+            String extensao = nomeOriginal != null && nomeOriginal.contains(".") 
+                    ? nomeOriginal.substring(nomeOriginal.lastIndexOf(".")) : "";
+            String nomeArquivoSalvo = java.util.UUID.randomUUID().toString() + extensao;
+
+            // Salva o arquivo no disco
+            java.nio.file.Path caminhoFinal = diretorioDestino.resolve(nomeArquivoSalvo);
+            java.nio.file.Files.copy(arquivo.getInputStream(), caminhoFinal, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+
+            // Monta a URL de retorno (Ajuste a porta 7000 se o seu servidor usar outra)
+            String urlArquivo = "http://localhost:7000/uploads/avisos/" + nomeArquivoSalvo;
+
+            // Retorna um JSON simples com a URL {"url": "http://..."}
+            return ResponseEntity.ok(java.util.Collections.singletonMap("url", urlArquivo));
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Erro interno no servidor ao fazer upload da imagem: " + e.getMessage());
+        }
     }
 }

@@ -55,6 +55,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/chamados/*/anexos").authenticated()
 
                         // 2. ROTAS DO PRÓPRIO USUÁRIO (O "me" tem que vir ANTES do "{id}")
+                        .requestMatchers(HttpMethod.GET,   "/notificacoes").authenticated()          
+                        .requestMatchers(HttpMethod.PATCH, "/notificacoes/*/lida").authenticated()   
                         .requestMatchers(HttpMethod.GET, "/usuarios/me").authenticated()
                         .requestMatchers(HttpMethod.PUT, "/usuarios/me").authenticated()
                         .requestMatchers(HttpMethod.PUT, "/usuarios/me/configurar-primeiro-acesso").authenticated()

@@ -185,6 +185,17 @@ CREATE TABLE links_uteis (
     data_cadastro TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+ 
+CREATE TABLE notificacoes (
+    id          BIGSERIAL PRIMARY KEY,
+    usuario_id  BIGINT REFERENCES users(id) ON DELETE CASCADE,   -- NULL = notificação geral
+    geral       BOOLEAN NOT NULL DEFAULT FALSE,
+    titulo      VARCHAR(255) NOT NULL,
+    mensagem    TEXT NOT NULL,
+    chamado_id  BIGINT REFERENCES chamados(id) ON DELETE SET NULL,
+    lida        BOOLEAN NOT NULL DEFAULT FALSE,
+    criada_em   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 -- ==============================================================================
 -- CRIAÇÃO DE ÍNDICES PARA OTIMIZAÇÃO DE BUSCAS
 -- ==============================================================================
@@ -200,3 +211,6 @@ CREATE INDEX idx_lembretes_status ON lembretes(status);
 CREATE INDEX idx_participantes_chamado ON chamado_participantes(id_chamado);
 CREATE INDEX idx_solicitacoes_rh_status ON solicitacoes_rh(status);
 CREATE INDEX idx_avisos_expiracao ON avisos_gerais(data_expiracao);
+CREATE INDEX idx_notificacoes_usuario  ON notificacoes(usuario_id);
+CREATE INDEX idx_notificacoes_chamado  ON notificacoes(chamado_id);
+CREATE INDEX idx_notificacoes_lida     ON notificacoes(lida);

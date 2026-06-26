@@ -6,9 +6,10 @@ public record AvisoResponseDTO(
     String conteudo,
     String urlImagem,
     String empresaAlvo,
+    Long idCriador, 
     String nomeCriador,
     String cargoCriador,
-    String setorCriador, // <--- NOVO CAMPO
+    String setorCriador,
     String fotoCriador,
     String dataCriacao
 ) {}
