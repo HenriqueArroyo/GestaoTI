@@ -59,7 +59,7 @@ public class DatabaseSeeder implements CommandLineRunner {
                 userRepository.save(tecnico);
             }
 
-            // 3. CRIAÇÃO USUÁRIO COMUM ENGEBAG
+            // 3. CRIAÇÃO USUÁRIO COMUM ENGE BAG
             if (userRepository.findByEmail("compras2@engebag.com.br").isEmpty()) {
                 User comumEngebag = new User();
                 comumEngebag.setNome("José Amaragi");
