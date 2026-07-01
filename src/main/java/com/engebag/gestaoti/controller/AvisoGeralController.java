@@ -15,6 +15,7 @@ import com.engebag.gestaoti.repository.PostCurtidaRepository;
 import com.engebag.gestaoti.repository.PostFavoritoRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.messaging.simp.SimpMessagingTemplate; // IMPORTANTE
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -36,6 +37,9 @@ public class AvisoGeralController {
     @Autowired private PostCurtidaRepository curtidaRepository;
     @Autowired private PostComentarioRepository comentarioRepository;
     @Autowired private PostFavoritoRepository favoritoRepository;
+
+    // Injeção do template de WebSocket para enviar mensagens ao frontend
+    @Autowired private SimpMessagingTemplate messagingTemplate;
 
     private User getUsuarioLogado() {
         return (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
@@ -77,6 +81,20 @@ public class AvisoGeralController {
         );
     }
 
+    // ── Helper: converte PostComentario → DTO ─────────────────────────────────
+    private ComentarioResponseDTO toComentarioDTO(PostComentario c) {
+        return new ComentarioResponseDTO(
+                c.getId(),
+                c.getUsuario().getId(),
+                c.getUsuario().getNome(),
+                c.getUsuario().getFotoPerfil(),
+                c.getConteudo(),
+                c.getPai() != null ? c.getPai().getId() : null,
+                c.getCriadoEm().toString(),
+                c.getEditadoEm() != null ? c.getEditadoEm().toString() : null
+        );
+    }
+
     // ── 1. LISTAR FEED ───────────────────────────────────────────────────────
     @GetMapping
     public ResponseEntity<List<AvisoResponseDTO>> listarFeed() {
@@ -93,7 +111,6 @@ public class AvisoGeralController {
 
         List<AvisoGeral> avisos = avisoGeralRepository.findAvisosAtivosParaEmpresas(empresasPermitidas);
 
-        // Fixados aparecem primeiro
         List<AvisoResponseDTO> resposta = avisos.stream()
                 .sorted(Comparator.comparing(AvisoGeral::getFixado).reversed()
                         .thenComparing(Comparator.comparing(AvisoGeral::getDataCriacao).reversed()))
@@ -175,10 +192,17 @@ public class AvisoGeralController {
         }
 
         avisoGeralRepository.deleteById(idAviso);
+
+        // AVISA O FRONTEND QUE O POST FOI EXCLUÍDO
+        messagingTemplate.convertAndSend("/topic/avisos", Map.of(
+            "tipo", "EXCLUIDO",
+            "payload", Map.of("id", idAviso)
+        ));
+
         return ResponseEntity.ok("Aviso excluído com sucesso.");
     }
 
-    // ── 5. FIXAR / DESAFIXAR (apenas ADMIN) ─────────────────────────────────
+    // ── 5. FIXAR / DESAFIXAR ─────────────────────────────────────────────────
     @PatchMapping("/{idAviso}/fixar")
     public ResponseEntity<?> toggleFixar(@PathVariable Long idAviso) {
         User usuarioLogado = getUsuarioLogado();
@@ -245,23 +269,18 @@ public class AvisoGeralController {
         return ResponseEntity.ok(Map.of("euFavoritei", euFavoritei));
     }
 
-    // ── 8. LISTAR COMENTÁRIOS ────────────────────────────────────────────────
+    // ── 8. LISTAR COMENTÁRIOS (raiz + respostas em lista plana) ───────────────
+    // O frontend monta a árvore localmente usando idPai.
     @GetMapping("/{idAviso}/comentarios")
     public ResponseEntity<?> listarComentarios(@PathVariable Long idAviso) {
-        List<PostComentario> comentarios = comentarioRepository.findByAvisoIdOrderByCriadoEmAsc(idAviso);
-        List<ComentarioResponseDTO> resposta = comentarios.stream().map(c -> new ComentarioResponseDTO(
-                c.getId(),
-                c.getUsuario().getId(),
-                c.getUsuario().getNome(),
-                c.getUsuario().getFotoPerfil(),
-                c.getConteudo(),
-                c.getCriadoEm().toString(),
-                c.getEditadoEm() != null ? c.getEditadoEm().toString() : null
-        )).toList();
-        return ResponseEntity.ok(resposta);
+        List<PostComentario> comentarios =
+                comentarioRepository.findByAvisoIdOrderByCriadoEmAsc(idAviso);
+        return ResponseEntity.ok(
+                comentarios.stream().map(this::toComentarioDTO).toList()
+        );
     }
 
-    // ── 9. CRIAR COMENTÁRIO ──────────────────────────────────────────────────
+    // ── 9. CRIAR COMENTÁRIO (raiz ou resposta) ────────────────────────────────
     @PostMapping("/{idAviso}/comentarios")
     public ResponseEntity<?> criarComentario(@PathVariable Long idAviso,
                                               @RequestBody ComentarioRequestDTO data) {
@@ -275,24 +294,24 @@ public class AvisoGeralController {
             comentario.setAviso(aviso);
             comentario.setUsuario(usuario);
             comentario.setConteudo(data.conteudo());
-            comentarioRepository.save(comentario);
 
-            return ResponseEntity.ok(new ComentarioResponseDTO(
-                    comentario.getId(),
-                    usuario.getId(),
-                    usuario.getNome(),
-                    usuario.getFotoPerfil(),
-                    comentario.getConteudo(),
-                    comentario.getCriadoEm().toString(),
-                    null
-            ));
+            // Resolve o comentário pai, se informado
+            if (data.idPai() != null) {
+                PostComentario pai = comentarioRepository.findById(data.idPai())
+                        .orElseThrow(() -> new RuntimeException("Comentário pai não encontrado."));
+                comentario.setPai(pai);
+            }
+
+            comentarioRepository.save(comentario);
+            return ResponseEntity.ok(toComentarioDTO(comentario));
+
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.status(500).body("Erro ao criar comentário: " + e.getMessage());
         }
     }
 
-    // ── 10. EXCLUIR COMENTÁRIO ───────────────────────────────────────────────
+    // ── 10. EXCLUIR COMENTÁRIO ────────────────────────────────────────────────
     @DeleteMapping("/{idAviso}/comentarios/{idComentario}")
     public ResponseEntity<?> excluirComentario(@PathVariable Long idAviso,
                                                 @PathVariable Long idComentario) {
@@ -307,6 +326,7 @@ public class AvisoGeralController {
             return ResponseEntity.status(403).body("Sem permissão para excluir este comentário.");
         }
 
+        // Ao excluir um comentário raiz, o ON DELETE CASCADE do banco remove as respostas.
         comentarioRepository.deleteById(idComentario);
         return ResponseEntity.ok("Comentário excluído.");
     }
