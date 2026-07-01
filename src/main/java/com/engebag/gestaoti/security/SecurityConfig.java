@@ -1,6 +1,5 @@
 package com.engebag.gestaoti.security;
 
-
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -38,8 +37,8 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 // Define a política de sessão como Stateless (sem estado)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-             // Configura as rotas
-      .authorizeHttpRequests(authorize -> authorize
+                // Configura as rotas
+                .authorizeHttpRequests(authorize -> authorize
                         // 1. ROTAS PÚBLICAS (Qualquer um acessa sem token)
                         .requestMatchers(HttpMethod.POST, "/auth/login").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/esqueci-senha").permitAll()
@@ -51,7 +50,6 @@ public class SecurityConfig {
 
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-
                         .requestMatchers(HttpMethod.POST, "/chamados/*/anexos").authenticated()
 
                         // 2. ROTAS DO PRÓPRIO USUÁRIO (O "me" tem que vir ANTES do "{id}")
@@ -62,6 +60,10 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/usuarios/me/configurar-primeiro-acesso").authenticated()
                         .requestMatchers(HttpMethod.GET, "/usuarios/participantes").authenticated()
                         .requestMatchers(HttpMethod.POST, "/chamados/*/participantes").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/canais/criar").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/canais").authenticated()
+
+                        
                         // 3. ROTAS DE GESTÃO (Apenas ADMIN e TECNICO)
                         .requestMatchers(HttpMethod.POST, "/usuarios").hasAnyRole("ADMIN", "TECNICO")
                         .requestMatchers(HttpMethod.GET, "/usuarios").hasAnyRole("ADMIN", "TECNICO")
@@ -92,7 +94,6 @@ public class SecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
         
         // Permite que qualquer IP ou domínio acesse a API (Ideal para desenvolvimento).
-        // Em produção, você pode trocar "*" pelo IP do servidor onde o React está hospedado.
         configuration.setAllowedOriginPatterns(List.of("*")); 
         
         // Quais métodos HTTP o frontend pode usar?
