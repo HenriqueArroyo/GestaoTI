@@ -1,5 +1,6 @@
 package com.engebag.gestaoti.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties; // Adicionado o import do Jackson
 import jakarta.persistence.*;
 import java.util.HashSet;
 import java.util.Set;
@@ -17,12 +18,14 @@ public class CanalComunicacao {
     @Enumerated(EnumType.STRING)
     private TipoCanal tipo;
 
+    // CORRIGIDO: Corta o loop de serialização JSON com as propriedades do User
     @ManyToMany
     @JoinTable(
         name = "canal_comunicacao_usuarios",
         joinColumns = @JoinColumn(name = "canal_id"),
         inverseJoinColumns = @JoinColumn(name = "user_id")
     )
+    @JsonIgnoreProperties({"senha", "authorities", "accountNonExpired", "accountNonLocked", "credentialsNonExpired", "enabled", "role"})
     private Set<User> participantes = new HashSet<>();
 
     public Long getId() {

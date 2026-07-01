@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.web.bind.annotation.*;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 @RestController
@@ -24,7 +25,6 @@ public class CanalController {
     @Autowired
     private SimpMessagingTemplate messagingTemplate;
 
-    // DTO simples em formato Record para receber os parâmetros do frontend React
     public record CriarCanalDTO(String nome, String tipo, Set<Long> usuarioIds) {}
 
     @PostMapping("/criar")
@@ -34,17 +34,14 @@ public class CanalController {
             canal.setNome(dto.nome());
             canal.setTipo(com.engebag.gestaoti.model.TipoCanal.valueOf(dto.tipo()));
             
-            // CORRIGIDO: Utilizando Set (HashSet) para bater com a estrutura do modelo CanalComunicacao
             Set<User> participantes = new HashSet<>();
             for (Long id : dto.usuarioIds()) {
                 userRepo.findById(id).ifPresent(participantes::add);
             }
             canal.setParticipantes(participantes);
             
-            // Salva o novo canal diretamente no banco de dados
             canalRepo.save(canal);
 
-            // Dispara a notificação via WebSocket para os membros envolvidos
             for (User usuario : participantes) {
                 messagingTemplate.convertAndSendToUser(
                     usuario.getId().toString(),
@@ -56,6 +53,16 @@ public class CanalController {
             return ResponseEntity.ok(canal);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Erro ao processar criação de canal: " + e.getMessage());
+        }
+    }
+
+    @GetMapping
+    public ResponseEntity<List<CanalComunicacao>> listarCanaisDoUsuario(@RequestParam Long usuarioId) {
+        try {
+            List<CanalComunicacao> canais = canalRepo.findByParticipanteId(usuarioId);
+            return ResponseEntity.ok(canais);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
         }
     }
 }

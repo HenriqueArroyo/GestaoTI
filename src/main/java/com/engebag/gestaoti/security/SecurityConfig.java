@@ -62,7 +62,6 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/chamados/*/participantes").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/canais/criar").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/canais").authenticated()
-
                         
                         // 3. ROTAS DE GESTÃO (Apenas ADMIN e TECNICO)
                         .requestMatchers(HttpMethod.POST, "/usuarios").hasAnyRole("ADMIN", "TECNICO")
